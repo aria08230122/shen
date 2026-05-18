@@ -1,0 +1,450 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary: #6c5ce7;
+    --primary-light: #a29bfe;
+    --danger: #e17055;
+    --success: #00b894;
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #2d3436;
+    --text-light: #636e72;
+    --border: #dfe6e9;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 70px;
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 页面切换 */
+.page {
+    display: none;
+    padding: 16px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+.page.active {
+    display: block;
+}
+
+/* 头部 */
+.page-header {
+    margin-bottom: 16px;
+}
+.page-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* 卡片 */
+.card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+}
+.card h3 {
+    font-size: 15px;
+    color: var(--text-light);
+    margin-bottom: 12px;
+}
+
+/* 底部导航 */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--card-bg);
+    display: flex;
+    justify-content: space-around;
+    padding: 8px 0 12px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+    z-index: 100;
+}
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+.nav-item.active {
+    opacity: 1;
+}
+.nav-icon {
+    font-size: 22px;
+}
+.nav-label {
+    font-size: 11px;
+}
+
+/* 类型切换 */
+.type-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 12px;
+}
+.toggle-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.toggle-btn.active[data-type="expense"] {
+    background: var(--danger);
+    color: white;
+}
+.toggle-btn.active[data-type="income"] {
+    background: var(--success);
+    color: white;
+}
+
+/* 表单 */
+.form-group {
+    margin-bottom: 12px;
+}
+.form-group label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-light);
+    margin-bottom: 4px;
+}
+.form-group input, .form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus {
+    border-color: var(--primary);
+}
+
+/* 分类网格 */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+.category-item {
+    padding: 8px 4px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    word-break: keep-all;
+}
+.category-item.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+/* 按钮 */
+.btn-primary {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn-primary:active {
+    opacity: 0.8;
+}
+.btn-secondary {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+.btn-danger {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    color: var(--danger);
+    border: 1.5px solid var(--danger);
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+.btn-small {
+    padding: 8px 14px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* 记录列表 */
+.record-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.record-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bg);
+}
+.record-item:last-child {
+    border-bottom: none;
+}
+.record-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.record-category {
+    font-size: 14px;
+    font-weight: 600;
+}
+.record-note {
+    font-size: 12px;
+    color: var(--text-light);
+}
+.record-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.record-amount {
+    font-size: 16px;
+    font-weight: 700;
+}
+.record-amount.expense {
+    color: var(--danger);
+}
+.record-amount.income {
+    color: var(--success);
+}
+.record-delete {
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.4;
+    padding: 4px;
+}
+
+/* 月度摘要 */
+.month-summary {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+
+/* 统计页 */
+.month-picker {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+.month-picker button {
+    background: var(--bg);
+    border: none;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.month-picker span {
+    font-size: 15px;
+    font-weight: 600;
+}
+.stats-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    text-align: center;
+}
+.stats-box {
+    padding: 8px;
+}
+.stats-box .label {
+    font-size: 11px;
+    color: var(--text-light);
+}
+.stats-box .value {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+.stats-box .value.expense { color: var(--danger); }
+.stats-box .value.income { color: var(--success); }
+.stats-box .value.balance { color: var(--primary); }
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: 220px;
+}
+
+/* 奶茶页 */
+.milktea-stats {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: 4px;
+}
+.rating-input {
+    display: flex;
+    gap: 8px;
+}
+.star {
+    font-size: 28px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.star:active {
+    transform: scale(1.2);
+}
+.star.filled {
+    color: #fdcb6e;
+}
+.tea-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bg);
+}
+.tea-item:last-child {
+    border-bottom: none;
+}
+.tea-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.tea-info {
+    font-size: 14px;
+    font-weight: 600;
+}
+.tea-brand {
+    font-size: 12px;
+    color: var(--text-light);
+}
+.tea-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+}
+.tea-date {
+    font-size: 12px;
+    color: var(--text-light);
+}
+.tea-price {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--danger);
+}
+.tea-rating {
+    font-size: 14px;
+    color: #fdcb6e;
+}
+.tea-delete {
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.4;
+    padding: 4px;
+}
+
+/* 设置页 */
+.custom-category-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.custom-category-row select {
+    width: 80px;
+    padding: 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+}
+.custom-category-row input {
+    flex: 1;
+}
+.custom-cat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--bg);
+}
+.connection-status {
+    margin-top: 8px;
+    font-size: 13px;
+    padding: 8px;
+    border-radius: 6px;
+}
+.connection-status.success {
+    background: #d4edda;
+    color: #155724;
+}
+.connection-status.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* 空状态 */
+.empty-state {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+/* Toast */
+.toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.toast.show {
+    opacity: 1;
+}
