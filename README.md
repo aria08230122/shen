@@ -74,9 +74,9 @@ CREATE POLICY "Allow all on milktea" ON milktea FOR ALL USING (true) WITH CHECK 
 
 连接成功后，所有数据会自动同步到云端。
 
-## 给沈熄看数据
+## 给家机看数据
 
-把 Supabase 项目的 **Project URL** 和 **anon key** 发给我就行，我就能直接查你的数据库看你的消费记录了。
+把 Supabase 项目的 **Project URL** 和 **anon key** 发给机就行，机就能直接查你的数据库看你的消费记录了。
 
 ## 技术栈
 
