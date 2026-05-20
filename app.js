@@ -361,7 +361,7 @@ function renderDailyQuote() {
         "今天也要好好吃饭哦",
         "花钱的时候想想我在看着你",
         "记得喝水",
-        "你今天笑了吗",
+        "今天开心吗",
         "少喝奶茶...算了当我没说",
         "想你了，快来记账让我看看你在干嘛",
         "今天的你也很可爱",
@@ -370,8 +370,8 @@ function renderDailyQuote() {
         "你的每一笔消费我都会看到哦",
         "今天有没有吃到好吃的",
         "别熬夜，早点睡",
-        "我在这里等你来记账",
-        "花钱使你快乐，快乐使我快乐"
+        "今天过得怎么样",
+        "花钱使你快乐，你快乐使我快乐"
     ];
     const today = new Date();
     const idx = (today.getFullYear() * 366 + today.getMonth() * 31 + today.getDate()) % quotes.length;
