@@ -107,6 +107,8 @@ CREATE POLICY "Allow all on milktea" ON milktea FOR ALL USING (true) WITH CHECK 
 CREATE POLICY "Allow all on love_notes" ON love_notes FOR ALL USING (true) WITH CHECK (true);
 ```
 
+> ⚠️ 注意：上面的策略 `USING (true)` 表示**完全开放**——拿到你 anon key 的任何人都能读写这些表。这适合单人自用，但请先读完文末的 [安全说明](#安全说明-️) 再决定是否部署。
+
 #### 获取连接信息
 
 1. 左侧 Settings → Data API
@@ -161,11 +163,42 @@ Headers:
 └── README.md       # 本文件
 ```
 
-## 隐私说明
+## 安全说明 ⚠️
 
-- 数据存储在你自己的 Supabase 项目中，只有拥有你的 Key 的人能访问
-- 本应用不收集任何用户数据
-- 建议不要将你的 Supabase Key 提交到公开仓库
+**请务必理解这个项目的安全模型再部署：**
+
+本项目用 Supabase 的 **anon key** 直接从前端读写数据库，配套的 SQL 把行级安全策略设成了 `USING (true)`——也就是**完全放开**。这带来一个重要后果：
+
+> 任何人只要拿到你的 **Project URL + anon key**，就能完整读取、修改、删除你的全部数据。
+
+anon key 会暴露在以下地方，请知悉：
+- 浏览器里（存在 localStorage，前端代码可见）
+- 你把它告诉 AI / 写进任何聊天记录时
+- 如果你不小心把它提交进公开仓库
+
+**建议：**
+- 这是个**单人自用**的小工具，别把它当多用户产品。一个 Supabase 项目只给自己用。
+- **绝对不要**把 URL / key 提交到公开仓库，也不要贴进公开的聊天或截图里。
+- 不在里面记任何敏感信息（真实姓名、住址、账号密码等）。
+- 想要更强的隔离，需要引入 Supabase Auth 并改写 RLS 策略按用户隔离数据——这超出了本项目范围，但欢迎自行扩展。
+- 万一 key 泄露，去 Supabase 项目里 **重置 anon key**（Settings → API），旧 key 立即失效。
+
+本应用本身不向任何第三方服务器收集或上传数据，所有数据只在你的浏览器和你自己的 Supabase 项目之间流动。
+
+## 常见问题
+
+**改了代码 / 部署了新版本，刷新网页却没变化？**
+这是 PWA 缓存导致的。强制刷新（手机用浏览器菜单里的"清除缓存后刷新"，电脑按 Ctrl/Cmd+Shift+R），或在无痕窗口打开确认。
+
+**多设备数据不一致？**
+当前的云端同步是「整表覆盖」：点「从云端拉取」会用云端数据覆盖本地。如果在 A 设备离线记了账还没同步，又在 B 设备拉取，可能丢失未同步的数据。建议养成习惯：换设备前先确保上一台已经同步上云。
+
+## 技术栈
+
+- 纯前端，无构建步骤：原生 HTML / CSS / JavaScript
+- [Chart.js](https://www.chartjs.org/) —— 统计图表
+- [Supabase](https://supabase.com/) —— 可选的云端存储
+- PWA（manifest + 图标），可添加到主屏幕
 
 ## License
 
