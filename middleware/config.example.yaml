@@ -1,0 +1,49 @@
+# 复制本文件为 config.yaml 再填写。config.yaml 不要提交到公开仓库（含 api_key）。
+
+# ----- Claude API（第三方中转站）-----
+claude:
+  # 中转站地址。可以填到 /v1 为止，脚本会自动补 /messages 或 /chat/completions。
+  base_url: "https://your-relay.example.com"
+  # 也可以用 endpoint 直接写死完整 URL（填了就忽略 base_url 的自动拼接）
+  # endpoint: "https://your-relay.example.com/v1/messages"
+  api_key: "在这里填你的 key（或用环境变量 CLAUDE_API_KEY）"
+  model: "claude-opus-4-7"
+  # 中转站如果是 Anthropic 原生格式用 anthropic；如果是 OpenAI 兼容格式用 openai
+  api_style: "anthropic"
+  anthropic_version: "2023-06-01"
+  max_tokens: 1024
+  temperature: 0.8
+  timeout: 60
+
+# ----- 人格模板（本地 YAML）-----
+persona:
+  file: "personas/default.yaml"
+
+# ----- OB 记忆 MCP -----
+memory:
+  enabled: true
+  # stdio：本地用命令启动 MCP server（最常见）
+  transport: "stdio"
+  command: "python"
+  args: ["-m", "ob_memory_server"]   # 改成你实际启动 OB 记忆 server 的命令
+  env: {}
+  # http：远程 MCP server（把 transport 改成 http 时用）
+  # transport: "http"
+  # url: "http://127.0.0.1:8000/mcp"
+  # headers: {}
+
+  # 拉记忆时依次调用哪些工具。OB 记忆系统：pulse=状态+桶列表，dream=最近新增的桶。
+  pull:
+    - tool: "pulse"
+      args: { include_archive: false }
+    - tool: "dream"
+      args: {}
+  max_chars: 4000   # 注入给模型的记忆最多多少字，超出截断
+
+# ----- 规则引擎 / CLI -----
+rules:
+  max_thoughts: 6     # 思维链最多几步
+
+cli:
+  show_thinking: true # 是否在终端打印本地生成的思维链
+  history_turns: 10   # 对话上下文保留最近几轮
