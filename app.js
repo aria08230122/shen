@@ -23,13 +23,15 @@ function initSupabase() {
 async function saveRecord(r) { const rs = getLocalRecords(); rs.unshift(r); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').insert(r); } catch(e){} }
 async function updateRecord(id, u) { let rs = getLocalRecords(); rs = rs.map(r => r.id===id ? {...r,...u} : r); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').update(u).eq('id',id); } catch(e){} }
 async function deleteRecord(id) { let rs = getLocalRecords(); rs = rs.filter(r => r.id!==id); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').delete().eq('id',id); } catch(e){} }
-async function saveTea(t) { const ts = getLocalTeas(); ts.unshift(t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').insert(t); } catch(e){} }
-async function updateTea(id, u) { let ts = getLocalTeas(); ts = ts.map(t => t.id===id ? {...t,...u} : t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').update(u).eq('id',id); } catch(e){} }
-async function deleteTea(id) { let ts = getLocalTeas(); ts = ts.filter(t => t.id!==id); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').delete().eq('id',id); } catch(e){} }
+async function saveTea(t) { const ts = getLocalTeas(); ts.unshift(t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').insert(teaForCloud(t)); } catch(e){} }
+async function updateTea(id, u) { let ts = getLocalTeas(); ts = ts.map(t => t.id===id ? {...t,...u} : t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').update(teaForCloud(u)).eq('id',id); } catch(e){} }
+async function deleteTea(id) { let ts = getLocalTeas(); const t = ts.find(x => x.id===id); ts = ts.filter(t => t.id!==id); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').delete().eq('id',id); } catch(e){} if(t && t.recordId) await deleteRecord(t.recordId); }
 function getLocalRecords() { return JSON.parse(localStorage.getItem('records') || '[]'); }
 function getLocalTeas() { return JSON.parse(localStorage.getItem('teas') || '[]'); }
+function teaForCloud(t) { const { recordId, ...rest } = t; return rest; }
 function getCategories() { const c = JSON.parse(localStorage.getItem('custom_categories') || '{"expense":[],"income":[]}'); return { expense: [...DEFAULT_CATEGORIES.expense,...c.expense], income: [...DEFAULT_CATEGORIES.income,...c.income] }; }
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg) { let el = document.querySelector('.toast'); if(!el){el=document.createElement('div');el.className='toast';document.body.appendChild(el);} el.textContent=msg;el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
 function getTodayStr() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function getNowTime() { const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
@@ -39,9 +41,12 @@ function getDateLabel(dateStr) { const today=getTodayStr(); if(dateStr===today) 
 function renderCategoryGrid(containerId, activeCategory, type, onClick) {
     const grid = document.getElementById(containerId);
     const cats = getCategories()[type || state.currentType];
-    grid.innerHTML = cats.map(c => `<div class="category-item${activeCategory===c?' active':''}" data-cat="${c}">${c}</div>`).join('');
+    grid.innerHTML = cats.map(c => `<div class="category-item${activeCategory===c?' active':''}" data-cat="${esc(c)}">${esc(c)}</div>`).join('');
     grid.querySelectorAll('.category-item').forEach(item => { item.addEventListener('click', () => onClick(item.dataset.cat)); });
 }
+
+function onHomeCatClick(cat) { state.selectedCategory = cat; renderCategoryGrid('category-grid', cat, null, onHomeCatClick); }
+function renderEditCatGrid(activeCat, type) { renderCategoryGrid('edit-category-grid', activeCat, type, (cat) => { state.editCategory = cat; renderEditCatGrid(cat, type); }); }
 
 function renderRecordList() {
     const list = document.getElementById('record-list');
@@ -62,7 +67,7 @@ function renderRecordList() {
         html += `<div class="date-group-header" data-date="${date}"><span>${getDateLabel(date)}</span><span class="day-total">-¥${dayTotal.toFixed(2)} ▾</span></div>`;
         html += `<div class="date-group-items" data-date="${date}">`;
         dayRecords.forEach(r => {
-            html += `<div class="record-item"><div class="record-left" data-id="${r.id}" style="cursor:pointer"><span class="record-category">${r.category}</span><span class="record-note">${r.time||''}${r.note?' · '+r.note:''}</span></div><div class="record-right"><span class="record-amount ${r.type}">${r.type==='expense'?'-':'+'}${r.amount.toFixed(2)}</span><span class="record-delete" data-id="${r.id}">✕</span></div></div>`;
+            html += `<div class="record-item"><div class="record-left" data-id="${r.id}" style="cursor:pointer"><span class="record-category">${esc(r.category)}</span><span class="record-note">${esc(r.time||'')}${r.note?' · '+esc(r.note):''}</span></div><div class="record-right"><span class="record-amount ${r.type}">${r.type==='expense'?'-':'+'}${r.amount.toFixed(2)}</span><span class="record-delete" data-id="${r.id}">✕</span></div></div>`;
         });
         html += `</div>`;
     });
@@ -90,7 +95,7 @@ function renderMonthSummary() {
 function renderFilterOptions() {
     const sel = document.getElementById('filter-category');
     const cats = [...getCategories().expense, ...getCategories().income];
-    sel.innerHTML = '<option value="">全部分类</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.innerHTML = '<option value="">全部分类</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
 }
 
 // ==================== 编辑记录 ====================
@@ -101,7 +106,7 @@ function openEditRecord(id) {
     document.getElementById('edit-date').value = r.date;
     document.getElementById('edit-time').value = r.time || '';
     document.getElementById('edit-note').value = r.note || '';
-    renderCategoryGrid('edit-category-grid', r.category, r.type, (cat) => { state.editCategory=cat; renderCategoryGrid('edit-category-grid', cat, r.type, arguments.callee); });
+    renderEditCatGrid(r.category, r.type);
     document.getElementById('modal-edit-record').classList.add('show');
 }
 function closeEditRecord() { document.getElementById('modal-edit-record').classList.remove('show'); }
@@ -138,8 +143,10 @@ async function saveEditTea() {
     const brand=document.getElementById('edit-tea-brand').value.trim(), name=document.getElementById('edit-tea-name').value.trim();
     const price=parseFloat(document.getElementById('edit-tea-price').value);
     if(!brand||!name||!price){toast('请填写完整');return;}
+    const tea = getLocalTeas().find(x => x.id===state.editingTeaId);
     await updateTea(state.editingTeaId, {date,time,brand,name,price,rating:state.editTeaRating,ice:state.editIce,sugar:state.editSugar});
-    closeEditTea(); renderTeaList(); toast('已更新');
+    if(tea && tea.recordId) await updateRecord(tea.recordId, {amount:price, date, time, note:`${brand} - ${name}`, category:'奶茶'});
+    closeEditTea(); renderTeaList(); renderRecordList(); renderMonthSummary(); toast('已更新');
 }
 
 // ==================== 统计页 ====================
@@ -173,9 +180,9 @@ function renderTeaList() {
     const now=new Date();const mTeas=teas.filter(t=>{const d=new Date(t.date);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();});
     document.getElementById('milktea-stats').innerHTML=`本月喝了 <b>${mTeas.length}</b> 杯，花了 <b style="color:var(--danger)">¥${mTeas.reduce((s,t)=>s+t.price,0).toFixed(2)}</b>`;
     if(teas.length===0){list.innerHTML='<div class="empty-state">还没有奶茶记录</div>';renderTeaRanking([]);return;}
-    list.innerHTML=teas.map(t=>`<div class="tea-item"><div class="tea-header" data-id="${t.id}" style="cursor:pointer"><div><div class="tea-info">${t.name}</div><div class="tea-brand">${t.brand}${t.ice?' · '+t.ice:''}${t.sugar?' · '+t.sugar:''}</div></div><span class="tea-delete" data-id="${t.id}">✕</span></div><div class="tea-meta"><span class="tea-date">${t.date}${t.time?' '+t.time:''}</span><span class="tea-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</span><span class="tea-price">¥${t.price.toFixed(2)}</span></div></div>`).join('');
+    list.innerHTML=teas.map(t=>`<div class="tea-item"><div class="tea-header" data-id="${t.id}" style="cursor:pointer"><div><div class="tea-info">${esc(t.name)}</div><div class="tea-brand">${esc(t.brand)}${t.ice?' · '+esc(t.ice):''}${t.sugar?' · '+esc(t.sugar):''}</div></div><span class="tea-delete" data-id="${t.id}">✕</span></div><div class="tea-meta"><span class="tea-date">${esc(t.date)}${t.time?' '+esc(t.time):''}</span><span class="tea-rating">${'★'.repeat(t.rating)}${'☆'.repeat(5-t.rating)}</span><span class="tea-price">¥${t.price.toFixed(2)}</span></div></div>`).join('');
     list.querySelectorAll('.tea-header').forEach(el=>{el.addEventListener('click',(e)=>{if(!e.target.classList.contains('tea-delete'))openEditTea(el.dataset.id);});});
-    list.querySelectorAll('.tea-delete').forEach(btn=>{btn.addEventListener('click',async(e)=>{e.stopPropagation();if(confirm('删除？')){await deleteTea(btn.dataset.id);renderTeaList();}});});
+    list.querySelectorAll('.tea-delete').forEach(btn=>{btn.addEventListener('click',async(e)=>{e.stopPropagation();if(confirm('删除？')){await deleteTea(btn.dataset.id);renderTeaList();renderRecordList();renderMonthSummary();}});});
     renderTeaRanking(teas);
 }
 function renderTeaRanking(teas) {
@@ -184,7 +191,7 @@ function renderTeaRanking(teas) {
     const sorted=[...teas].sort((a,b)=>b.rating-a.rating||b.price-a.price).slice(0,5);
     const brandCount={};teas.forEach(t=>{brandCount[t.brand]=(brandCount[t.brand]||0)+1;});
     const topBrand=Object.entries(brandCount).sort((a,b)=>b[1]-a[1])[0];
-    el.innerHTML=`<div class="ranking-section"><b>最爱喝：</b>${sorted[0].name}（${sorted[0].brand}）⭐${sorted[0].rating}</div><div class="ranking-section"><b>最常买：</b>${topBrand[0]}（${topBrand[1]}杯）</div>`;
+    el.innerHTML=`<div class="ranking-section"><b>最爱喝：</b>${esc(sorted[0].name)}（${esc(sorted[0].brand)}）⭐${sorted[0].rating}</div><div class="ranking-section"><b>最常买：</b>${esc(topBrand[0])}（${topBrand[1]}杯）</div>`;
 }
 
 // ==================== 设置页 ====================
@@ -193,7 +200,7 @@ function renderCustomCategories() {
     const container=document.getElementById('custom-categories-list');
     const all=[...custom.expense.map(c=>({name:c,type:'expense'})),...custom.income.map(c=>({name:c,type:'income'}))];
     if(all.length===0){container.innerHTML='<div class="empty-state">暂无自定义分类</div>';return;}
-    container.innerHTML=all.map(c=>`<div class="custom-cat-item"><span>${c.type==='expense'?'支出':'收入'} · ${c.name}</span><span class="record-delete" data-name="${c.name}" data-type="${c.type}">✕</span></div>`).join('');
+    container.innerHTML=all.map(c=>`<div class="custom-cat-item"><span>${c.type==='expense'?'支出':'收入'} · ${esc(c.name)}</span><span class="record-delete" data-name="${esc(c.name)}" data-type="${c.type}">✕</span></div>`).join('');
     container.querySelectorAll('.record-delete').forEach(btn=>{btn.addEventListener('click',()=>{const custom=JSON.parse(localStorage.getItem('custom_categories')||'{"expense":[],"income":[]}');custom[btn.dataset.type]=custom[btn.dataset.type].filter(c=>c!==btn.dataset.name);localStorage.setItem('custom_categories',JSON.stringify(custom));renderCustomCategories();renderFilterOptions();toast('已删除');});});
 }
 
@@ -201,17 +208,21 @@ function renderCustomCategories() {
 async function syncToCloud() {
     if(!state.supabase)return;
     const records=getLocalRecords(),teas=getLocalTeas();
+    const notes=JSON.parse(localStorage.getItem('love_notes')||'[]');
     if(records.length>0) try{await state.supabase.from('records').upsert(records,{onConflict:'id'});}catch(e){}
-    if(teas.length>0) try{await state.supabase.from('milktea').upsert(teas,{onConflict:'id'});}catch(e){}
+    if(teas.length>0) try{await state.supabase.from('milktea').upsert(teas.map(teaForCloud),{onConflict:'id'});}catch(e){}
+    if(notes.length>0) try{await state.supabase.from('love_notes').upsert(notes,{onConflict:'id'});}catch(e){}
 }
 async function syncFromCloud() {
     if(!state.supabase){toast('未连接');return;}
     try {
         const {data:records}=await state.supabase.from('records').select('*');
         const {data:teas}=await state.supabase.from('milktea').select('*');
+        const {data:notes}=await state.supabase.from('love_notes').select('*');
         if(records) localStorage.setItem('records',JSON.stringify(records));
         if(teas) localStorage.setItem('teas',JSON.stringify(teas));
-        renderRecordList();renderMonthSummary();renderFilterOptions();toast('已从云端拉取');
+        if(notes) localStorage.setItem('love_notes',JSON.stringify(notes));
+        renderRecordList();renderMonthSummary();renderFilterOptions();renderNotes();toast('已从云端拉取');
     } catch(e){toast('拉取失败: '+e.message);}
 }
 
@@ -233,7 +244,7 @@ function init() {
     document.getElementById('btn-go-settings').addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-settings').classList.add('active');renderCustomCategories();});
 
     // 类型切换
-    document.querySelectorAll('.toggle-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state.currentType=btn.dataset.type;state.selectedCategory=null;renderCategoryGrid('category-grid',null,null,(cat)=>{state.selectedCategory=cat;renderCategoryGrid('category-grid',cat,null,arguments.callee);});});});
+    document.querySelectorAll('.toggle-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state.currentType=btn.dataset.type;state.selectedCategory=null;renderCategoryGrid('category-grid',null,null,onHomeCatClick);});});
 
     // 添加记录
     document.getElementById('btn-add').addEventListener('click',async()=>{
@@ -241,7 +252,7 @@ function init() {
         if(!amount||amount<=0){toast('请输入金额');return;}if(!state.selectedCategory){toast('请选择分类');return;}
         await saveRecord({id:generateId(),type:state.currentType,amount,category:state.selectedCategory,date,time,note,created_at:new Date().toISOString()});
         toast('记录成功');document.getElementById('amount').value='';document.getElementById('note').value='';document.getElementById('record-time').value=getNowTime();state.selectedCategory=null;
-        renderCategoryGrid('category-grid',null,null,(cat)=>{state.selectedCategory=cat;renderCategoryGrid('category-grid',cat,null,arguments.callee);});renderRecordList();renderMonthSummary();
+        renderCategoryGrid('category-grid',null,null,onHomeCatClick);renderRecordList();renderMonthSummary();
     });
 
     // 筛选
@@ -263,8 +274,9 @@ function init() {
     document.getElementById('btn-add-tea').addEventListener('click',async()=>{
         const date=document.getElementById('tea-date').value,time=document.getElementById('tea-time').value,brand=document.getElementById('tea-brand').value.trim(),name=document.getElementById('tea-name').value.trim(),price=parseFloat(document.getElementById('tea-price').value);
         if(!brand){toast('请输入品牌');return;}if(!name){toast('请输入名称');return;}if(!price||price<=0){toast('请输入价格');return;}if(state.teaRating===0){toast('请评分');return;}
-        await saveTea({id:generateId(),date,time,brand,name,price,rating:state.teaRating,ice:state.selectedIce,sugar:state.selectedSugar,created_at:new Date().toISOString()});
-        await saveRecord({id:generateId(),type:'expense',amount:price,category:'奶茶',date,time,note:`${brand} - ${name}`,created_at:new Date().toISOString()});
+        const teaRecordId=generateId();
+        await saveRecord({id:teaRecordId,type:'expense',amount:price,category:'奶茶',date,time,note:`${brand} - ${name}`,created_at:new Date().toISOString()});
+        await saveTea({id:generateId(),date,time,brand,name,price,rating:state.teaRating,ice:state.selectedIce,sugar:state.selectedSugar,recordId:teaRecordId,created_at:new Date().toISOString()});
         toast('记录成功');document.getElementById('tea-brand').value='';document.getElementById('tea-name').value='';document.getElementById('tea-price').value='';document.getElementById('tea-time').value=getNowTime();
         state.teaRating=0;document.querySelectorAll('#tea-rating .star').forEach(s=>{s.textContent='☆';s.classList.remove('filled');});
         renderTeaList();renderRecordList();renderMonthSummary();
@@ -309,7 +321,7 @@ function init() {
     if(su)document.getElementById('supabase-url').value=su;if(sk)document.getElementById('supabase-key').value=sk;
 
     // 初始渲染
-    renderCategoryGrid('category-grid',null,null,(cat)=>{state.selectedCategory=cat;renderCategoryGrid('category-grid',cat,null,arguments.callee);});
+    renderCategoryGrid('category-grid',null,null,onHomeCatClick);
     renderFilterOptions();renderRecordList();renderMonthSummary();
     renderDailyQuote();renderStreak();
 
@@ -319,7 +331,7 @@ function init() {
         const el = document.getElementById('random-tea-result');
         if (teas.length === 0) { el.innerHTML = '<div class="empty-state">还没有评分≥3的奶茶记录</div>'; return; }
         const pick = teas[Math.floor(Math.random() * teas.length)];
-        el.innerHTML = `<div class="random-tea-card"><div class="tea-info">${pick.name}</div><div class="tea-brand">${pick.brand} · ${pick.ice||''} · ${pick.sugar||''}</div><div class="tea-rating">${'★'.repeat(pick.rating)}${'☆'.repeat(5-pick.rating)} · ¥${pick.price.toFixed(2)}</div></div>`;
+        el.innerHTML = `<div class="random-tea-card"><div class="tea-info">${esc(pick.name)}</div><div class="tea-brand">${esc(pick.brand)} · ${esc(pick.ice||'')} · ${esc(pick.sugar||'')}</div><div class="tea-rating">${'★'.repeat(pick.rating)}${'☆'.repeat(5-pick.rating)} · ¥${pick.price.toFixed(2)}</div></div>`;
     });
 
     // 留言板
@@ -398,7 +410,7 @@ function renderNotes() {
     const notes = JSON.parse(localStorage.getItem('love_notes') || '[]').slice(0, 20);
     const el = document.getElementById('notes-list');
     if (notes.length === 0) { el.innerHTML = '<div class="empty-state">还没有留言</div>'; return; }
-    el.innerHTML = notes.map(n => `<div class="record-item"><div class="record-left"><span class="record-category">${n.content}</span><span class="record-note">${n.date} ${n.time||''}</span></div><div class="record-right"><span class="record-delete" data-nid="${n.id}">✕</span></div></div>`).join('');
+    el.innerHTML = notes.map(n => `<div class="record-item"><div class="record-left"><span class="record-category">${esc(n.content)}</span><span class="record-note">${esc(n.date)} ${esc(n.time||'')}</span></div><div class="record-right"><span class="record-delete" data-nid="${n.id}">✕</span></div></div>`).join('');
     el.querySelectorAll('.record-delete').forEach(btn => {
         btn.addEventListener('click', () => {
             let notes = JSON.parse(localStorage.getItem('love_notes') || '[]');
@@ -420,7 +432,7 @@ function renderTodoList() {
     el.innerHTML = todos.map(t => `
         <div class="todo-item ${t.done ? 'done' : ''}">
             <div class="todo-check" data-id="${t.id}">${t.done ? '✓' : ''}</div>
-            <span class="todo-text">${t.text}</span>
+            <span class="todo-text">${esc(t.text)}</span>
             <span class="todo-delete" data-id="${t.id}">✕</span>
         </div>
     `).join('');
