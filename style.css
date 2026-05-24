@@ -114,21 +114,22 @@ body {
     border-color: var(--border);
 }
 .card h3 {
-    font-size: 15px;
+    font-size: 17px;
     color: var(--primary-dark);
     margin-bottom: 14px;
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 .card h3::before {
     content: '';
-    width: 30px;
-    height: 30px;
+    width: 48px;
+    height: 48px;
     background: url("assets/stickers/letter.png") center/contain no-repeat;
     display: inline-block;
     vertical-align: middle;
+    flex-shrink: 0;
 }
 
 /* 底部导航 */
