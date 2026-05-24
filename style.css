@@ -123,8 +123,12 @@ body {
     gap: 6px;
 }
 .card h3::before {
-    content: '🎀';
-    font-size: 13px;
+    content: '';
+    width: 22px;
+    height: 22px;
+    background: url("assets/stickers/letter.png") center/contain no-repeat;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* 底部导航 */
@@ -261,7 +265,7 @@ body {
 .btn-primary {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #f8a5c2, var(--primary-dark));
+    background: linear-gradient(135deg, #c9a3a3, #9d8084);
     color: white;
     border: none;
     border-radius: 16px;
@@ -269,12 +273,12 @@ body {
     font-weight: 800;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 16px rgba(244, 143, 177, 0.4);
+    box-shadow: 0 4px 14px rgba(157, 128, 132, 0.28);
     letter-spacing: 0.5px;
 }
 .btn-primary:active {
     transform: scale(0.97);
-    box-shadow: 0 2px 8px rgba(244, 143, 177, 0.3);
+    box-shadow: 0 2px 6px rgba(157, 128, 132, 0.22);
 }
 .btn-secondary {
     width: 100%;
@@ -301,14 +305,14 @@ body {
 }
 .btn-small {
     padding: 10px 16px;
-    background: linear-gradient(135deg, #f8a5c2, var(--primary-dark));
+    background: linear-gradient(135deg, #c9a3a3, #9d8084);
     color: white;
     border: none;
     border-radius: 12px;
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 3px 10px rgba(244, 143, 177, 0.35);
+    box-shadow: 0 3px 10px rgba(157, 128, 132, 0.28);
 }
 
 /* 记录列表 */
@@ -859,11 +863,14 @@ body {
 
 /* 设置按钮 */
 .settings-btn {
-    font-size: 22px;
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
     cursor: pointer;
-    padding: 4px;
+    padding: 2px;
     transition: transform 0.2s;
+    filter: drop-shadow(0 2px 4px rgba(157, 128, 132, 0.25));
 }
 .settings-btn:active {
-    transform: rotate(45deg) scale(0.9);
+    transform: rotate(10deg) scale(0.92);
 }
