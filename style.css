@@ -5,22 +5,22 @@
 }
 
 :root {
-    --primary: #f48fb1;
-    --primary-light: #fce4ec;
-    --primary-dark: #ec407a;
-    --primary-soft: #fff0f6;
-    --danger: #f06292;
-    --success: #b5d99c;
-    --bg: #fff5f8;
+    --primary: #d4a5b3;
+    --primary-light: #efd9e0;
+    --primary-dark: #a87889;
+    --primary-soft: #faf3f6;
+    --danger: #c08699;
+    --success: #a8b89c;
+    --bg: #fbf5f7;
     --card-bg: #ffffff;
-    --text: #5d4954;
-    --text-light: #b48ba0;
-    --border: #fbcfe0;
-    --border-dashed: #f7a8c4;
+    --text: #6b525a;
+    --text-light: #b59ba4;
+    --border: #ead4dc;
+    --border-dashed: #d4a5b3;
     --cream: #fffaf3;
-    --shadow: 0 4px 18px rgba(244, 143, 177, 0.15);
-    --shadow-soft: 0 2px 10px rgba(244, 143, 177, 0.10);
-    --nav-bg: #fff8fb;
+    --shadow: 0 4px 18px rgba(168, 120, 137, 0.14);
+    --shadow-soft: 0 2px 10px rgba(168, 120, 137, 0.09);
+    --nav-bg: #fbf5f7;
 }
 
 body {
@@ -29,7 +29,7 @@ body {
     background-image:
         radial-gradient(circle at 15% 20%, rgba(244,143,177,0.08) 0%, transparent 40%),
         radial-gradient(circle at 85% 80%, rgba(252,228,236,0.5) 0%, transparent 40%),
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><path d='M30 18c-2-4-8-4-8 0 0 4 8 8 8 8s8-4 8-8c0-4-6-4-8 0z' fill='%23fbcfe0' opacity='0.22'/></svg>");
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'><path d='M30 18c-2-4-8-4-8 0 0 4 8 8 8 8s8-4 8-8c0-4-6-4-8 0z' fill='%23d4a5b3' opacity='0.18'/></svg>");
     background-size: auto, auto, 120px 120px;
     color: var(--text);
     padding-bottom: 80px;
@@ -71,7 +71,7 @@ body {
     position: absolute;
     left: 0; right: 0; bottom: 0;
     height: 8px;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='8' viewBox='0 0 20 8'><path d='M0 4 Q 5 0 10 4 T 20 4' stroke='%23f7a8c4' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='8' viewBox='0 0 20 8'><path d='M0 4 Q 5 0 10 4 T 20 4' stroke='%23d4a5b3' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");
     background-repeat: repeat-x;
     background-size: 20px 8px;
     opacity: 0.9;
@@ -141,7 +141,7 @@ body {
     display: flex;
     justify-content: space-around;
     padding: 10px 0 16px;
-    box-shadow: 0 -4px 20px rgba(244, 143, 177, 0.12);
+    box-shadow: 0 -4px 20px rgba(212, 165, 179, 0.12);
     z-index: 100;
     border-top: 1.5px dashed var(--border-dashed);
     backdrop-filter: blur(10px);
@@ -194,7 +194,7 @@ body {
 .toggle-btn.active[data-type="expense"] {
     background: var(--primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(244, 143, 177, 0.4);
+    box-shadow: 0 4px 12px rgba(212, 165, 179, 0.4);
 }
 .toggle-btn.active[data-type="income"] {
     background: var(--success);
@@ -226,7 +226,7 @@ body {
 .form-group input:focus, .form-group select:focus {
     border-color: var(--primary);
     background: white;
-    box-shadow: 0 0 0 4px rgba(244, 143, 177, 0.15);
+    box-shadow: 0 0 0 4px rgba(212, 165, 179, 0.15);
 }
 .form-group input::placeholder {
     color: #d8b3c4;
@@ -258,14 +258,14 @@ body {
     border-color: var(--primary);
     background: var(--primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(244, 143, 177, 0.35);
+    box-shadow: 0 4px 12px rgba(212, 165, 179, 0.35);
 }
 
 /* 按钮 */
 .btn-primary {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #c9a3a3, #9d8084);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: white;
     border: none;
     border-radius: 16px;
@@ -273,12 +273,12 @@ body {
     font-weight: 800;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 14px rgba(157, 128, 132, 0.28);
+    box-shadow: 0 4px 14px rgba(168, 120, 137, 0.28);
     letter-spacing: 0.5px;
 }
 .btn-primary:active {
     transform: scale(0.97);
-    box-shadow: 0 2px 6px rgba(157, 128, 132, 0.22);
+    box-shadow: 0 2px 6px rgba(168, 120, 137, 0.22);
 }
 .btn-secondary {
     width: 100%;
@@ -305,14 +305,14 @@ body {
 }
 .btn-small {
     padding: 10px 16px;
-    background: linear-gradient(135deg, #c9a3a3, #9d8084);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: white;
     border: none;
     border-radius: 12px;
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 3px 10px rgba(157, 128, 132, 0.28);
+    box-shadow: 0 3px 10px rgba(168, 120, 137, 0.28);
 }
 
 /* 记录列表 */
@@ -369,7 +369,7 @@ body {
 }
 .record-delete:active {
     opacity: 1;
-    background: rgba(244, 143, 177, 0.15);
+    background: rgba(212, 165, 179, 0.15);
 }
 
 /* 月度摘要 */
@@ -579,7 +579,7 @@ body {
     z-index: 999;
     opacity: 0;
     transition: opacity 0.3s ease;
-    box-shadow: 0 4px 16px rgba(236, 64, 122, 0.35);
+    box-shadow: 0 4px 16px rgba(168, 120, 137, 0.35);
 }
 .toast.show {
     opacity: 1;
@@ -607,7 +607,7 @@ body {
     max-width: 400px;
     max-height: 85vh;
     overflow-y: auto;
-    box-shadow: 0 8px 32px rgba(244, 143, 177, 0.25);
+    box-shadow: 0 8px 32px rgba(212, 165, 179, 0.25);
     border: 2px dashed var(--border-dashed);
 }
 .modal-content h3 {
@@ -869,7 +869,7 @@ body {
     cursor: pointer;
     padding: 2px;
     transition: transform 0.2s;
-    filter: drop-shadow(0 2px 4px rgba(157, 128, 132, 0.25));
+    filter: drop-shadow(0 2px 4px rgba(168, 120, 137, 0.25));
 }
 .settings-btn:active {
     transform: rotate(10deg) scale(0.92);
