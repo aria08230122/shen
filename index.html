@@ -10,29 +10,29 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.png" type="image/png">
     <link rel="apple-touch-icon" href="icon.png">
-    <meta name="theme-color" content="#b57edc">
+    <meta name="theme-color" content="#fff5f9">
 </head>
 <body>
     <!-- 底部导航 -->
     <nav class="bottom-nav">
         <div class="nav-item active" data-page="home">
-            <span class="nav-icon">📝</span>
+            <img class="nav-icon" id="nav-icon-home" src="assets/stickers/wave.png" alt="">
             <span class="nav-label">记账</span>
         </div>
         <div class="nav-item" data-page="stats">
-            <span class="nav-icon">📊</span>
+            <img class="nav-icon" id="nav-icon-stats" src="assets/stickers/scooter.png" alt="">
             <span class="nav-label">统计</span>
         </div>
         <div class="nav-item" data-page="milktea">
-            <span class="nav-icon">🧋</span>
+            <img class="nav-icon" id="nav-icon-milktea" src="assets/stickers/pool.png" alt="">
             <span class="nav-label">奶茶</span>
         </div>
         <div class="nav-item" data-page="todo">
-            <span class="nav-icon">📋</span>
+            <img class="nav-icon" id="nav-icon-todo" src="assets/stickers/nap.png" alt="">
             <span class="nav-label">待办</span>
         </div>
         <div class="nav-item" data-page="notes">
-            <span class="nav-icon">💌</span>
+            <img class="nav-icon" id="nav-icon-notes" src="assets/stickers/hug.png" alt="">
             <span class="nav-label">留言</span>
         </div>
     </nav>
@@ -121,7 +121,7 @@
             </div>
         </div>
         <div class="card">
-            <h3>📋 周报</h3>
+            <h3>周报</h3>
             <button class="btn-secondary" id="btn-weekly-report">生成本周周报</button>
             <pre id="weekly-report-output" style="white-space:pre-wrap;font-size:13px;margin-top:10px;color:var(--text);display:none;background:var(--bg);padding:12px;border-radius:12px;"></pre>
         </div>
@@ -173,13 +173,13 @@
         </div>
         <!-- 随机奶茶推荐 -->
         <div class="card">
-            <h3>🎲 今天喝什么？</h3>
+            <h3>今天喝什么？</h3>
             <div id="random-tea-result" class="random-tea-result"></div>
             <button class="btn-secondary" id="btn-random-tea">摇一摇</button>
         </div>
         <!-- 奶茶排行榜 -->
         <div class="card">
-            <h3>🏆 奶茶排行榜</h3>
+            <h3>奶茶排行榜</h3>
             <div id="tea-ranking"></div>
         </div>
         <div class="card">

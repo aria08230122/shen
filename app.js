@@ -54,14 +54,21 @@ const BUILTIN_THEMES = {
             '--text-light': '#bb98a8',
             '--border': '#ffd9e6',
             '--border-dashed': '#ffb8d4',
-            '--nav-bg': '#fff5f9',
-            '--sticker-h3': 'url("assets/stickers/letter.png")'
+            '--nav-bg': '#fff5f9'
         },
         stickers: {
             settings: 'assets/stickers/balloon.png',
             home: 'assets/stickers/wave.png',
             stats: 'assets/stickers/scooter.png',
             milktea: 'assets/stickers/pool.png'
+        },
+        h3Stickers: ['assets/stickers/letter.png'],
+        navIcons: {
+            home: 'assets/stickers/wave.png',
+            stats: 'assets/stickers/scooter.png',
+            milktea: 'assets/stickers/pool.png',
+            todo: 'assets/stickers/nap.png',
+            notes: 'assets/stickers/hug.png'
         }
     },
     hellokitty: {
@@ -79,14 +86,21 @@ const BUILTIN_THEMES = {
             '--text-light': '#bb98a8',
             '--border': '#ffd9e6',
             '--border-dashed': '#ff6b8a',
-            '--nav-bg': '#fffafc',
-            '--sticker-h3': 'url("assets/themes/hellokitty/h3.png")'
+            '--nav-bg': '#fffafc'
         },
         stickers: {
             settings: 'assets/themes/hellokitty/settings.png',
             home: 'assets/themes/hellokitty/home.png',
             stats: 'assets/themes/hellokitty/stats.png',
             milktea: 'assets/themes/hellokitty/milktea.png'
+        },
+        h3Stickers: ['assets/themes/hellokitty/sushi.png', 'assets/themes/hellokitty/uniform.png'],
+        navIcons: {
+            home: 'assets/themes/hellokitty/home.png',
+            stats: 'assets/themes/hellokitty/stats.png',
+            milktea: 'assets/themes/hellokitty/milktea.png',
+            todo: 'assets/themes/hellokitty/h3.png',
+            notes: 'assets/themes/hellokitty/settings.png'
         }
     }
 };
@@ -103,6 +117,24 @@ function applyTheme(id) {
     setSrc('sticker-home', t.stickers.home);
     setSrc('sticker-stats', t.stickers.stats);
     setSrc('sticker-milktea', t.stickers.milktea);
+    if (t.navIcons) {
+        setSrc('nav-icon-home', t.navIcons.home);
+        setSrc('nav-icon-stats', t.navIcons.stats);
+        setSrc('nav-icon-milktea', t.navIcons.milktea);
+        setSrc('nav-icon-todo', t.navIcons.todo);
+        setSrc('nav-icon-notes', t.navIcons.notes);
+    }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && t.vars['--bg']) meta.setAttribute('content', t.vars['--bg']);
+    randomizeH3Stickers();
+}
+function randomizeH3Stickers() {
+    const t = BUILTIN_THEMES[getActiveThemeId()] || BUILTIN_THEMES.puppy;
+    const pool = t.h3Stickers && t.h3Stickers.length ? t.h3Stickers : ['assets/stickers/letter.png'];
+    document.querySelectorAll('.card h3').forEach(h3 => {
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        h3.style.setProperty('--sticker-h3', `url("${pick}")`);
+    });
 }
 function renderThemeSettings() {
     const sel = document.getElementById('theme-select');
