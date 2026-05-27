@@ -292,6 +292,11 @@ function renderStats() {
 // ==================== 奶茶页 ====================
 function renderTeaList() {
     const list=document.getElementById('tea-list'),teas=getLocalTeas();
+    teas.sort((a, b) => {
+        if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+        if ((a.time || '') !== (b.time || '')) return (b.time || '').localeCompare(a.time || '');
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
     const now=new Date();const mTeas=teas.filter(t=>{const d=new Date(t.date);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth();});
     document.getElementById('milktea-stats').innerHTML=`本月喝了 <b>${mTeas.length}</b> 杯，花了 <b style="color:var(--danger)">¥${mTeas.reduce((s,t)=>s+t.price,0).toFixed(2)}</b>`;
     if(teas.length===0){list.innerHTML='<div class="empty-state">还没有奶茶记录</div>';renderTeaRanking([]);return;}
@@ -538,7 +543,13 @@ function renderStreak() {
 
 // ==================== 留言板 ====================
 function renderNotes() {
-    const notes = JSON.parse(localStorage.getItem('love_notes') || '[]').slice(0, 20);
+    const all = JSON.parse(localStorage.getItem('love_notes') || '[]');
+    all.sort((a, b) => {
+        if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+        if ((a.time || '') !== (b.time || '')) return (b.time || '').localeCompare(a.time || '');
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+    const notes = all.slice(0, 20);
     const el = document.getElementById('notes-list');
     if (notes.length === 0) { el.innerHTML = '<div class="empty-state">还没有留言</div>'; return; }
     el.innerHTML = notes.map(n => `<div class="record-item"><div class="record-left"><span class="record-category">${esc(n.content)}</span><span class="record-note">${esc(n.date)} ${esc(n.time||'')}</span></div><div class="record-right"><span class="record-delete" data-nid="${n.id}">✕</span></div></div>`).join('');
