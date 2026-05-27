@@ -165,7 +165,10 @@ body {
     transform: translateY(-2px);
 }
 .nav-icon {
-    font-size: 24px;
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+    display: block;
 }
 .nav-label {
     font-size: 11px;
