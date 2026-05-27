@@ -18,6 +18,7 @@
     --border: #ffd9e6;
     --border-dashed: #ffb8d4;
     --cream: #fffaf3;
+    --sticker-h3: url("assets/stickers/letter.png");
     --shadow: 0 4px 18px rgba(255, 144, 184, 0.18);
     --shadow-soft: 0 2px 10px rgba(255, 144, 184, 0.12);
     --nav-bg: #fff5f9;
@@ -126,7 +127,7 @@ body {
     content: '';
     width: 48px;
     height: 48px;
-    background: url("assets/stickers/letter.png") center/contain no-repeat;
+    background: var(--sticker-h3) center/contain no-repeat;
     display: inline-block;
     vertical-align: middle;
     flex-shrink: 0;
