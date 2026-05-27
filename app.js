@@ -161,6 +161,11 @@ function renderEditCatGrid(activeCat, type) { renderCategoryGrid('edit-category-
 function renderRecordList() {
     const list = document.getElementById('record-list');
     let records = getLocalRecords();
+    records.sort((a, b) => {
+        if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+        if ((a.time || '') !== (b.time || '')) return (b.time || '').localeCompare(a.time || '');
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
     const filterCat = document.getElementById('filter-category').value;
     const filterSearch = document.getElementById('filter-search').value.trim().toLowerCase();
     if (filterCat) records = records.filter(r => r.category === filterCat);
