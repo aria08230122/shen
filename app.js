@@ -63,6 +63,31 @@ const BUILTIN_THEMES = {
             stats: 'assets/stickers/scooter.png',
             milktea: 'assets/stickers/pool.png'
         }
+    },
+    hellokitty: {
+        name: 'Hello Kitty',
+        vars: {
+            '--primary': '#ff6b8a',
+            '--primary-light': '#ffd9e3',
+            '--primary-dark': '#d63867',
+            '--primary-soft': '#fff5f8',
+            '--danger': '#ff5571',
+            '--success': '#a8d99c',
+            '--bg': '#fffafc',
+            '--card-bg': '#ffffff',
+            '--text': '#5d4954',
+            '--text-light': '#bb98a8',
+            '--border': '#ffd9e6',
+            '--border-dashed': '#ff6b8a',
+            '--nav-bg': '#fffafc',
+            '--sticker-h3': 'url("assets/themes/hellokitty/h3.png")'
+        },
+        stickers: {
+            settings: 'assets/themes/hellokitty/settings.png',
+            home: 'assets/themes/hellokitty/home.png',
+            stats: 'assets/themes/hellokitty/stats.png',
+            milktea: 'assets/themes/hellokitty/milktea.png'
+        }
     }
 };
 function getThemeNames() { return JSON.parse(localStorage.getItem('theme_names') || '{}'); }
