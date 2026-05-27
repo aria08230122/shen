@@ -37,6 +37,59 @@ function getTodayStr() { const d=new Date(); return `${d.getFullYear()}-${String
 function getNowTime() { const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 function getDateLabel(dateStr) { const today=getTodayStr(); if(dateStr===today) return '今天'; const y=new Date(); y.setDate(y.getDate()-1); const yStr=`${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`; if(dateStr===yStr) return '昨天'; return dateStr.slice(5).replace('-','月')+'日'; }
 
+// ==================== 主题 ====================
+const BUILTIN_THEMES = {
+    puppy: {
+        name: '小狗',
+        vars: {
+            '--primary': '#ffb8d4',
+            '--primary-light': '#ffe0ec',
+            '--primary-dark': '#e879a0',
+            '--primary-soft': '#fff5f9',
+            '--danger': '#ff7da0',
+            '--success': '#a8d99c',
+            '--bg': '#fff5f9',
+            '--card-bg': '#ffffff',
+            '--text': '#5d4954',
+            '--text-light': '#bb98a8',
+            '--border': '#ffd9e6',
+            '--border-dashed': '#ffb8d4',
+            '--nav-bg': '#fff5f9',
+            '--sticker-h3': 'url("assets/stickers/letter.png")'
+        },
+        stickers: {
+            settings: 'assets/stickers/balloon.png',
+            home: 'assets/stickers/wave.png',
+            stats: 'assets/stickers/scooter.png',
+            milktea: 'assets/stickers/pool.png'
+        }
+    }
+};
+function getThemeNames() { return JSON.parse(localStorage.getItem('theme_names') || '{}'); }
+function setThemeName(id, name) { const n = getThemeNames(); n[id] = name; localStorage.setItem('theme_names', JSON.stringify(n)); }
+function getDisplayName(id) { return getThemeNames()[id] || (BUILTIN_THEMES[id] && BUILTIN_THEMES[id].name) || id; }
+function getActiveThemeId() { const id = localStorage.getItem('active_theme'); return BUILTIN_THEMES[id] ? id : 'puppy'; }
+function setActiveTheme(id) { localStorage.setItem('active_theme', id); applyTheme(id); }
+function applyTheme(id) {
+    const t = BUILTIN_THEMES[id] || BUILTIN_THEMES.puppy;
+    Object.entries(t.vars).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+    const setSrc = (elId, path) => { const el = document.getElementById(elId); if (el) el.src = path; };
+    setSrc('btn-go-settings', t.stickers.settings);
+    setSrc('sticker-home', t.stickers.home);
+    setSrc('sticker-stats', t.stickers.stats);
+    setSrc('sticker-milktea', t.stickers.milktea);
+}
+function renderThemeSettings() {
+    const sel = document.getElementById('theme-select');
+    if (!sel) return;
+    const active = getActiveThemeId();
+    sel.innerHTML = Object.keys(BUILTIN_THEMES).map(id =>
+        `<option value="${esc(id)}"${id === active ? ' selected' : ''}>${esc(getDisplayName(id))}</option>`
+    ).join('');
+    const input = document.getElementById('theme-rename-input');
+    if (input) input.value = getDisplayName(active);
+}
+
 // ==================== 渲染 ====================
 function renderCategoryGrid(containerId, activeCategory, type, onClick) {
     const grid = document.getElementById(containerId);
@@ -231,6 +284,7 @@ function setupChips(id,key){document.querySelectorAll(`#${id} .option-chip`).for
 
 function init() {
     initSupabase();
+    applyTheme(getActiveThemeId());
     document.getElementById('record-date').value=getTodayStr();
     document.getElementById('record-time').value=getNowTime();
     document.getElementById('tea-date').value=getTodayStr();
@@ -239,9 +293,9 @@ function init() {
     if(savedBudget) document.getElementById('budget-input').value=savedBudget;
 
     // 导航
-    document.querySelectorAll('.nav-item').forEach(item=>{item.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));item.classList.add('active');document.getElementById(`page-${item.dataset.page}`).classList.add('active');if(item.dataset.page==='stats')renderStats();if(item.dataset.page==='milktea')renderTeaList();if(item.dataset.page==='settings')renderCustomCategories();if(item.dataset.page==='notes')renderNotes();if(item.dataset.page==='todo')renderTodoList();});});
+    document.querySelectorAll('.nav-item').forEach(item=>{item.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));item.classList.add('active');document.getElementById(`page-${item.dataset.page}`).classList.add('active');if(item.dataset.page==='stats')renderStats();if(item.dataset.page==='milktea')renderTeaList();if(item.dataset.page==='settings'){renderCustomCategories();renderThemeSettings();}if(item.dataset.page==='notes')renderNotes();if(item.dataset.page==='todo')renderTodoList();});});
     // 设置按钮
-    document.getElementById('btn-go-settings').addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-settings').classList.add('active');renderCustomCategories();});
+    document.getElementById('btn-go-settings').addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-settings').classList.add('active');renderCustomCategories();renderThemeSettings();});
 
     // 类型切换
     document.querySelectorAll('.toggle-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state.currentType=btn.dataset.type;state.selectedCategory=null;renderCategoryGrid('category-grid',null,null,onHomeCatClick);});});
@@ -303,6 +357,21 @@ function init() {
 
     // 预算
     document.getElementById('btn-save-budget').addEventListener('click',()=>{const v=document.getElementById('budget-input').value;localStorage.setItem('monthly_budget',v||'0');toast('预算已保存');});
+
+    // 主题
+    document.getElementById('theme-select').addEventListener('change', (e) => {
+        setActiveTheme(e.target.value);
+        document.getElementById('theme-rename-input').value = getDisplayName(e.target.value);
+        toast('已切换主题');
+    });
+    document.getElementById('btn-save-theme-name').addEventListener('click', () => {
+        const name = document.getElementById('theme-rename-input').value.trim();
+        if (!name) { toast('请输入主题名'); return; }
+        setThemeName(getActiveThemeId(), name);
+        renderThemeSettings();
+        toast('名称已保存');
+    });
+    renderThemeSettings();
 
     // 自定义分类
     document.getElementById('btn-add-category').addEventListener('click',()=>{

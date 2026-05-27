@@ -42,7 +42,7 @@
         <header class="page-header">
             <div style="display:flex;justify-content:space-between;align-items:center">
                 <div style="display:flex;align-items:center;gap:10px">
-                    <img class="sticker-inline" src="assets/stickers/wave.png" alt="">
+                    <img class="sticker-inline" id="sticker-home" src="assets/stickers/wave.png" alt="">
                     <h1>记账</h1>
                 </div>
                 <img class="settings-btn" id="btn-go-settings" src="assets/stickers/balloon.png" alt="设置">
@@ -92,7 +92,7 @@
     <div class="page" id="page-stats">
         <header class="page-header">
             <div style="display:flex;align-items:center;gap:10px">
-                <img class="sticker-inline" src="assets/stickers/scooter.png" alt="">
+                <img class="sticker-inline" id="sticker-stats" src="assets/stickers/scooter.png" alt="">
                 <h1>统计</h1>
             </div>
             <div class="month-picker">
@@ -131,7 +131,7 @@
     <div class="page" id="page-milktea">
         <header class="page-header">
             <div style="display:flex;align-items:center;gap:10px">
-                <img class="sticker-inline" src="assets/stickers/pool.png" alt="">
+                <img class="sticker-inline" id="sticker-milktea" src="assets/stickers/pool.png" alt="">
                 <h1>奶茶日记 🧋</h1>
             </div>
             <div class="milktea-stats" id="milktea-stats"></div>
@@ -228,6 +228,18 @@
             <button class="btn-primary" id="btn-save-config">保存连接</button>
             <button class="btn-secondary" id="btn-sync-from-cloud" style="margin-top:8px">从云端拉取数据</button>
             <div class="connection-status" id="connection-status"></div>
+        </div>
+        <div class="card">
+            <h3>外观主题</h3>
+            <div class="form-group">
+                <label>当前主题</label>
+                <select id="theme-select"></select>
+            </div>
+            <div class="form-group">
+                <label>重命名当前主题</label>
+                <input type="text" id="theme-rename-input" placeholder="主题名">
+            </div>
+            <button class="btn-primary" id="btn-save-theme-name">保存名称</button>
         </div>
         <div class="card">
             <h3>月度预算</h3>
