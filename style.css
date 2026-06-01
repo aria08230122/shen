@@ -879,3 +879,57 @@ body {
 .settings-btn:active {
     transform: rotate(10deg) scale(0.92);
 }
+
+/* 启动加载页 */
+.splash {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    transition: opacity 0.45s ease;
+}
+.splash.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+.splash-img {
+    width: 200px;
+    height: 200px;
+    object-fit: contain;
+    filter: drop-shadow(0 6px 14px rgba(255, 144, 184, 0.25));
+    animation: splashBob 1.4s ease-in-out infinite;
+}
+@keyframes splashBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+.splash-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    letter-spacing: 1px;
+}
+.splash-bar {
+    width: 220px;
+    height: 10px;
+    background: var(--primary-light);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(255, 144, 184, 0.2);
+}
+.splash-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    border-radius: 6px;
+    animation: splashFill 1.4s ease-out forwards;
+}
+@keyframes splashFill {
+    from { width: 0%; }
+    to { width: 100%; }
+}
