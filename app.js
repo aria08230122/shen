@@ -352,6 +352,13 @@ function setupChips(id,key){document.querySelectorAll(`#${id} .option-chip`).for
 function init() {
     initSupabase();
     applyTheme(getActiveThemeId());
+    setTimeout(() => {
+        const splash = document.getElementById('splash');
+        if (splash) {
+            splash.classList.add('hidden');
+            setTimeout(() => splash.remove(), 500);
+        }
+    }, 1500);
     document.getElementById('record-date').value=getTodayStr();
     document.getElementById('record-time').value=getNowTime();
     document.getElementById('tea-date').value=getTodayStr();
