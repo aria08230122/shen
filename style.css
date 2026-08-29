@@ -538,16 +538,33 @@ body {
     border-bottom: 1.5px dashed var(--border-dashed);
     color: var(--text);
 }
+.settings-note {
+    margin: -2px 0 14px;
+    color: var(--text-light);
+    font-size: 12px;
+    line-height: 1.65;
+}
 .connection-status {
     margin-top: 10px;
     font-size: 13px;
     padding: 10px 14px;
     border-radius: 12px;
     font-weight: 700;
+    line-height: 1.5;
+    background: var(--primary-soft);
+    color: var(--text-light);
 }
 .connection-status.success {
     background: #e6f7e9;
     color: #2f7a3a;
+}
+.connection-status.warning {
+    background: #fff4d9;
+    color: #8a6423;
+}
+.connection-status.syncing {
+    background: var(--primary-light);
+    color: var(--primary-dark);
 }
 .connection-status.error {
     background: #fde2e8;

@@ -3,33 +3,248 @@ const DEFAULT_CATEGORIES = {
     expense: ['餐饮', '奶茶', '交通', '购物', '娱乐', '学习', '日用', '其他'],
     income: ['生活费', '兼职', '红包', '其他']
 };
+const SYNC_QUEUE_KEY = 'sync_queue_v2';
+const SYNC_BOOTSTRAPPED_KEY = 'sync_bootstrapped_v2';
+const PENDING_CLOUD_REPLACE_KEY = 'pending_cloud_replace_v2';
+const LAST_SYNC_KEY = 'last_sync_at';
+const BACKUP_APP = 'shen-moneytracker';
+const BACKUP_VERSION = 2;
 let state = {
     currentType: 'expense', selectedCategory: null, editCategory: null,
     currentMonth: new Date(), teaRating: 0, editTeaRating: 0,
     editingRecordId: null, editingTeaId: null,
     selectedIce: '正常冰', selectedSugar: '正常糖',
-    editIce: '正常冰', editSugar: '正常糖', supabase: null
+    editIce: '正常冰', editSugar: '正常糖', supabase: null,
+    syncPromise: null, fullSyncPromise: null, localRevision: 0
 };
 
 // ==================== Supabase ====================
 function initSupabase() {
     const url = localStorage.getItem('supabase_url');
     const key = localStorage.getItem('supabase_key');
-    if (url && key) { try { state.supabase = supabase.createClient(url, key); return true; } catch(e) { return false; } }
+    if (url && key) {
+        try {
+            state.supabase = supabase.createClient(url, key);
+            renderSyncStatus();
+            return true;
+        } catch (e) {
+            state.supabase = null;
+            setConnectionStatus(`连接配置无效：${formatCloudError(e)}`, 'error');
+            return false;
+        }
+    }
+    state.supabase = null;
+    renderSyncStatus();
     return false;
 }
 
 // ==================== 数据层 ====================
-async function saveRecord(r) { const rs = getLocalRecords(); rs.unshift(r); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').insert(r); } catch(e){} }
-async function updateRecord(id, u) { let rs = getLocalRecords(); rs = rs.map(r => r.id===id ? {...r,...u} : r); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').update(u).eq('id',id); } catch(e){} }
-async function deleteRecord(id) { let rs = getLocalRecords(); rs = rs.filter(r => r.id!==id); localStorage.setItem('records', JSON.stringify(rs)); if(state.supabase) try { await state.supabase.from('records').delete().eq('id',id); } catch(e){} }
-async function saveTea(t) { const ts = getLocalTeas(); ts.unshift(t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').insert(teaForCloud(t)); } catch(e){} }
-async function updateTea(id, u) { let ts = getLocalTeas(); ts = ts.map(t => t.id===id ? {...t,...u} : t); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').update(teaForCloud(u)).eq('id',id); } catch(e){} }
-async function deleteTea(id) { let ts = getLocalTeas(); const t = ts.find(x => x.id===id); ts = ts.filter(t => t.id!==id); localStorage.setItem('teas', JSON.stringify(ts)); if(state.supabase) try { await state.supabase.from('milktea').delete().eq('id',id); } catch(e){} if(t && t.recordId) await deleteRecord(t.recordId); }
-function getLocalRecords() { return JSON.parse(localStorage.getItem('records') || '[]'); }
-function getLocalTeas() { return JSON.parse(localStorage.getItem('teas') || '[]'); }
-function teaForCloud(t) { const { recordId, ...rest } = t; return rest; }
-function getCategories() { const c = JSON.parse(localStorage.getItem('custom_categories') || '{"expense":[],"income":[]}'); return { expense: [...DEFAULT_CATEGORIES.expense,...c.expense], income: [...DEFAULT_CATEGORIES.income,...c.income] }; }
+function readJson(key, fallback) {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    try { return JSON.parse(raw); }
+    catch (e) {
+        console.warn(`无法读取本地数据：${key}`, e);
+        return fallback;
+    }
+}
+function writeJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+function getLocalRecords() {
+    const rows = readJson('records', []);
+    return Array.isArray(rows) ? rows.map(normalizeRecord) : [];
+}
+function getLocalTeas() {
+    const rows = readJson('teas', []);
+    return Array.isArray(rows) ? rows.map(normalizeTea) : [];
+}
+function getLoveNotes() {
+    const rows = readJson('love_notes', []);
+    return Array.isArray(rows) ? rows.map(normalizeNote) : [];
+}
+function getCustomCategories() {
+    const value = readJson('custom_categories', {expense: [], income: []});
+    return {
+        expense: Array.isArray(value && value.expense) ? value.expense.map(String) : [],
+        income: Array.isArray(value && value.income) ? value.income.map(String) : []
+    };
+}
+function normalizeRecord(r = {}) {
+    if (!r || typeof r !== 'object') r = {};
+    return {
+        id: String(r.id || generateId()),
+        type: r.type === 'income' ? 'income' : 'expense',
+        amount: Number(r.amount) || 0,
+        category: String(r.category || '其他'),
+        date: String(r.date || getTodayStr()),
+        time: String(r.time || ''),
+        note: String(r.note || ''),
+        created_at: String(r.created_at || new Date().toISOString())
+    };
+}
+function normalizeTea(t = {}) {
+    if (!t || typeof t !== 'object') t = {};
+    const tea = {
+        id: String(t.id || generateId()),
+        date: String(t.date || getTodayStr()),
+        time: String(t.time || ''),
+        brand: String(t.brand || ''),
+        name: String(t.name || ''),
+        price: Number(t.price) || 0,
+        rating: Math.max(0, Math.min(5, Number(t.rating) || 0)),
+        ice: String(t.ice || '正常冰'),
+        sugar: String(t.sugar || '正常糖'),
+        created_at: String(t.created_at || new Date().toISOString())
+    };
+    if (t.recordId) tea.recordId = String(t.recordId);
+    return tea;
+}
+function normalizeNote(n = {}) {
+    if (!n || typeof n !== 'object') n = {};
+    return {
+        id: String(n.id || generateId()),
+        content: String(n.content || ''),
+        date: String(n.date || getTodayStr()),
+        time: String(n.time || ''),
+        created_at: String(n.created_at || new Date().toISOString())
+    };
+}
+function recordForCloud(r) { return normalizeRecord(r); }
+function teaForCloud(t) {
+    const tea = normalizeTea(t);
+    delete tea.recordId;
+    return tea;
+}
+function noteForCloud(n) { return normalizeNote(n); }
+function getCategories() {
+    const c = getCustomCategories();
+    return { expense: [...DEFAULT_CATEGORIES.expense, ...c.expense], income: [...DEFAULT_CATEGORIES.income, ...c.income] };
+}
+function getSyncQueue() {
+    const queue = readJson(SYNC_QUEUE_KEY, []);
+    return Array.isArray(queue) ? queue : [];
+}
+function saveSyncQueue(queue) {
+    writeJson(SYNC_QUEUE_KEY, queue);
+    renderSyncStatus();
+}
+function queueOperation(table, action, rowId, data) {
+    const id = String(rowId);
+    const queue = getSyncQueue().filter(op => !(op.table === table && String(op.rowId) === id));
+    queue.push({
+        id: generateId(), table, action, rowId: id,
+        data: action === 'upsert' ? data : undefined,
+        queuedAt: new Date().toISOString()
+    });
+    state.localRevision += 1;
+    saveSyncQueue(queue);
+}
+function queueUpsert(table, row) {
+    const data = table === 'records' ? recordForCloud(row) : table === 'milktea' ? teaForCloud(row) : noteForCloud(row);
+    queueOperation(table, 'upsert', data.id, data);
+}
+function queueDelete(table, id) { queueOperation(table, 'delete', id); }
+function findLinkedRecordForTea(tea, records = getLocalRecords()) {
+    if (!tea) return null;
+    if (tea.recordId) {
+        const linked = records.find(r => r.id === String(tea.recordId));
+        if (linked) return linked;
+    }
+    const sameId = records.find(r => r.id === String(tea.id) && r.category === '奶茶');
+    if (sameId) return sameId;
+    const expectedNote = `${tea.brand} - ${tea.name}`;
+    return records.find(r => r.category === '奶茶' && r.date === tea.date && (r.time || '') === (tea.time || '') && Number(r.amount) === Number(tea.price) && (r.note || '') === expectedNote) || null;
+}
+function findLinkedTeaForRecord(record, teas = getLocalTeas()) {
+    if (!record) return null;
+    const direct = teas.find(t => String(t.recordId || '') === String(record.id));
+    if (direct) return direct;
+    const sameId = teas.find(t => t.id === String(record.id));
+    if (sameId) return sameId;
+    if (record.category !== '奶茶') return null;
+    return teas.find(t => t.date === record.date && (t.time || '') === (record.time || '') && Number(t.price) === Number(record.amount) && `${t.brand} - ${t.name}` === (record.note || '')) || null;
+}
+function repairTeaLinks(teas, records) {
+    const used = new Set();
+    return teas.map(raw => {
+        const tea = normalizeTea(raw);
+        let linked = findLinkedRecordForTea(tea, records);
+        if (linked && used.has(linked.id)) linked = null;
+        if (linked) {
+            tea.recordId = linked.id;
+            used.add(linked.id);
+        }
+        return tea;
+    });
+}
+async function saveRecord(r) {
+    const row = normalizeRecord(r);
+    const rs = getLocalRecords().filter(x => x.id !== row.id);
+    rs.unshift(row);
+    writeJson('records', rs);
+    queueUpsert('records', row);
+    return flushSyncQueue({silent: true});
+}
+async function updateRecord(id, updates) {
+    const rs = getLocalRecords();
+    const old = rs.find(r => r.id === String(id));
+    if (!old) return {ok: false, reason: 'not-found'};
+    const row = normalizeRecord({...old, ...updates, id: old.id});
+    writeJson('records', rs.map(r => r.id === old.id ? row : r));
+    queueUpsert('records', row);
+    const linkedTea = findLinkedTeaForRecord(old);
+    if (linkedTea) {
+        const teaUpdates = {price: row.amount, date: row.date, time: row.time};
+        const noteParts = row.note.match(/^(.+?)\s-\s(.+)$/);
+        if (noteParts) { teaUpdates.brand = noteParts[1]; teaUpdates.name = noteParts[2]; }
+        const updatedTea = normalizeTea({...linkedTea, ...teaUpdates, id: linkedTea.id, recordId: row.id});
+        writeJson('teas', getLocalTeas().map(t => t.id === linkedTea.id ? updatedTea : t));
+        queueUpsert('milktea', updatedTea);
+    }
+    return flushSyncQueue({silent: true});
+}
+async function deleteRecord(id) {
+    const rowId = String(id);
+    const records = getLocalRecords();
+    const record = records.find(r => r.id === rowId);
+    const linkedTea = findLinkedTeaForRecord(record);
+    writeJson('records', records.filter(r => r.id !== rowId));
+    queueDelete('records', rowId);
+    if (linkedTea) {
+        writeJson('teas', getLocalTeas().filter(t => t.id !== linkedTea.id));
+        queueDelete('milktea', linkedTea.id);
+    }
+    return flushSyncQueue({silent: true});
+}
+async function saveTea(t) {
+    const row = normalizeTea(t);
+    const ts = getLocalTeas().filter(x => x.id !== row.id);
+    ts.unshift(row);
+    writeJson('teas', ts);
+    queueUpsert('milktea', row);
+    return flushSyncQueue({silent: true});
+}
+async function updateTea(id, updates) {
+    const ts = getLocalTeas();
+    const old = ts.find(t => t.id === String(id));
+    if (!old) return {ok: false, reason: 'not-found'};
+    const row = normalizeTea({...old, ...updates, id: old.id});
+    writeJson('teas', ts.map(t => t.id === old.id ? row : t));
+    queueUpsert('milktea', row);
+    return flushSyncQueue({silent: true});
+}
+async function deleteTea(id) {
+    const rowId = String(id);
+    const teas = getLocalTeas();
+    const tea = teas.find(t => t.id === rowId);
+    const linked = findLinkedRecordForTea(tea);
+    writeJson('teas', teas.filter(t => t.id !== rowId));
+    queueDelete('milktea', rowId);
+    if (linked) {
+        writeJson('records', getLocalRecords().filter(r => r.id !== linked.id));
+        queueDelete('records', linked.id);
+    }
+    return flushSyncQueue({silent: true});
+}
 function generateId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function esc(s) { return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function toast(msg) { let el = document.querySelector('.toast'); if(!el){el=document.createElement('div');el.className='toast';document.body.appendChild(el);} el.textContent=msg;el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2000); }
@@ -104,7 +319,10 @@ const BUILTIN_THEMES = {
         }
     }
 };
-function getThemeNames() { return JSON.parse(localStorage.getItem('theme_names') || '{}'); }
+function getThemeNames() {
+    const names = readJson('theme_names', {});
+    return names && typeof names === 'object' && !Array.isArray(names) ? names : {};
+}
 function setThemeName(id, name) { const n = getThemeNames(); n[id] = name; localStorage.setItem('theme_names', JSON.stringify(n)); }
 function getDisplayName(id) { return getThemeNames()[id] || (BUILTIN_THEMES[id] && BUILTIN_THEMES[id].name) || id; }
 function getActiveThemeId() { const id = localStorage.getItem('active_theme'); return BUILTIN_THEMES[id] ? id : 'puppy'; }
@@ -232,7 +450,7 @@ async function saveEditRecord() {
     const note=document.getElementById('edit-note').value.trim();
     if(!amount||amount<=0){toast('请输入金额');return;}
     await updateRecord(state.editingRecordId, {amount, date, time, note, category: state.editCategory});
-    closeEditRecord(); renderRecordList(); renderMonthSummary(); toast('已更新');
+    closeEditRecord(); renderRecordList(); renderMonthSummary(); toast(getSyncQueue().length ? '已更新本机，等待同步' : '已更新');
 }
 
 // ==================== 编辑奶茶 ====================
@@ -259,9 +477,10 @@ async function saveEditTea() {
     const price=parseFloat(document.getElementById('edit-tea-price').value);
     if(!brand||!name||!price){toast('请填写完整');return;}
     const tea = getLocalTeas().find(x => x.id===state.editingTeaId);
+    const linkedRecord = findLinkedRecordForTea(tea);
     await updateTea(state.editingTeaId, {date,time,brand,name,price,rating:state.editTeaRating,ice:state.editIce,sugar:state.editSugar});
-    if(tea && tea.recordId) await updateRecord(tea.recordId, {amount:price, date, time, note:`${brand} - ${name}`, category:'奶茶'});
-    closeEditTea(); renderTeaList(); renderRecordList(); renderMonthSummary(); toast('已更新');
+    if(linkedRecord) await updateRecord(linkedRecord.id, {amount:price, date, time, note:`${brand} - ${name}`, category:'奶茶'});
+    closeEditTea(); renderTeaList(); renderRecordList(); renderMonthSummary(); toast(getSyncQueue().length ? '已更新本机，等待同步' : '已更新');
 }
 
 // ==================== 统计页 ====================
@@ -316,34 +535,361 @@ function renderTeaRanking(teas) {
 
 // ==================== 设置页 ====================
 function renderCustomCategories() {
-    const custom=JSON.parse(localStorage.getItem('custom_categories')||'{"expense":[],"income":[]}');
+    const custom=getCustomCategories();
     const container=document.getElementById('custom-categories-list');
     const all=[...custom.expense.map(c=>({name:c,type:'expense'})),...custom.income.map(c=>({name:c,type:'income'}))];
     if(all.length===0){container.innerHTML='<div class="empty-state">暂无自定义分类</div>';return;}
     container.innerHTML=all.map(c=>`<div class="custom-cat-item"><span>${c.type==='expense'?'支出':'收入'} · ${esc(c.name)}</span><span class="record-delete" data-name="${esc(c.name)}" data-type="${c.type}">✕</span></div>`).join('');
-    container.querySelectorAll('.record-delete').forEach(btn=>{btn.addEventListener('click',()=>{const custom=JSON.parse(localStorage.getItem('custom_categories')||'{"expense":[],"income":[]}');custom[btn.dataset.type]=custom[btn.dataset.type].filter(c=>c!==btn.dataset.name);localStorage.setItem('custom_categories',JSON.stringify(custom));renderCustomCategories();renderFilterOptions();toast('已删除');});});
+    container.querySelectorAll('.record-delete').forEach(btn=>{btn.addEventListener('click',()=>{const custom=getCustomCategories();custom[btn.dataset.type]=custom[btn.dataset.type].filter(c=>c!==btn.dataset.name);writeJson('custom_categories',custom);renderCustomCategories();renderFilterOptions();toast('已删除');});});
 }
 
 // ==================== 云端同步 ====================
-async function syncToCloud() {
-    if(!state.supabase)return;
-    const records=getLocalRecords(),teas=getLocalTeas();
-    const notes=JSON.parse(localStorage.getItem('love_notes')||'[]');
-    if(records.length>0) try{await state.supabase.from('records').upsert(records,{onConflict:'id'});}catch(e){}
-    if(teas.length>0) try{await state.supabase.from('milktea').upsert(teas.map(teaForCloud),{onConflict:'id'});}catch(e){}
-    if(notes.length>0) try{await state.supabase.from('love_notes').upsert(notes,{onConflict:'id'});}catch(e){}
+function setConnectionStatus(message, type = '') {
+    const el = document.getElementById('connection-status');
+    if (!el) return;
+    el.textContent = message;
+    el.className = `connection-status${type ? ` ${type}` : ''}`;
 }
-async function syncFromCloud() {
-    if(!state.supabase){toast('未连接');return;}
+function formatCloudError(error) {
+    const message = error && (error.message || error.error_description || error.details);
+    if (!message) return '未知错误';
+    if (/failed to fetch|network|load failed/i.test(message)) return '网络不可用或项目仍在启动';
+    if (/jwt|api key|unauthorized|invalid key/i.test(message)) return 'Project URL 或 Anon Key 无效';
+    if (/does not exist|not found|relation/i.test(message)) return '数据表不存在，请检查 Supabase 表结构';
+    return String(message);
+}
+function formatSyncTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('zh-CN', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}).format(date);
+}
+function renderSyncStatus(message, type) {
+    if (message) { setConnectionStatus(message, type); return; }
+    const pending = getSyncQueue().length;
+    const lastSync = formatSyncTime(localStorage.getItem(LAST_SYNC_KEY));
+    if (!state.supabase) {
+        setConnectionStatus(pending ? `已保存在本机 · ${pending} 项等待云端连接` : '云端未连接 · 当前数据保存在本机', 'warning');
+    } else if (pending) {
+        setConnectionStatus(`本机数据安全 · ${pending} 项等待同步`, 'warning');
+    } else if (lastSync) {
+        setConnectionStatus(`已同步 · ${lastSync}`, 'success');
+    } else {
+        setConnectionStatus('云端已配置 · 正在等待首次同步', 'syncing');
+    }
+}
+async function checkCloudClient(client) {
+    const checks = await Promise.all([
+        client.from('records').select('id').limit(1),
+        client.from('milktea').select('id').limit(1),
+        client.from('love_notes').select('id').limit(1)
+    ]);
+    const failed = checks.find(result => result.error);
+    if (failed) throw failed.error;
+    return true;
+}
+async function flushSyncQueue({silent = false} = {}) {
+    if (state.syncPromise) return state.syncPromise;
+    if (!state.supabase) {
+        renderSyncStatus();
+        return {ok: false, reason: 'not-connected', pending: getSyncQueue().length};
+    }
+    state.syncPromise = (async () => {
+        const original = getSyncQueue();
+        if (original.length === 0) return {ok: true, pending: 0};
+        setConnectionStatus(`正在同步 ${original.length} 项本机更改…`, 'syncing');
+        const completedIds = new Set();
+        try {
+            const groups = new Map();
+            original.forEach(op => {
+                if (!['records', 'milktea', 'love_notes'].includes(op.table) || !['upsert', 'delete'].includes(op.action)) throw new Error('同步队列包含无效操作');
+                const key = `${op.table}:${op.action}`;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(op);
+            });
+            for (const group of groups.values()) {
+                for (let offset = 0; offset < group.length; offset += 200) {
+                    const chunk = group.slice(offset, offset + 200);
+                    const result = chunk[0].action === 'delete'
+                        ? await state.supabase.from(chunk[0].table).delete().in('id', chunk.map(op => op.rowId))
+                        : await state.supabase.from(chunk[0].table).upsert(chunk.map(op => op.data), {onConflict: 'id'});
+                    if (result.error) throw result.error;
+                    chunk.forEach(op => completedIds.add(op.id));
+                }
+            }
+            const pending = getSyncQueue().filter(op => !completedIds.has(op.id));
+            saveSyncQueue(pending);
+            localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+            renderSyncStatus();
+            if (pending.length) setTimeout(() => flushSyncQueue({silent: true}), 0);
+            return {ok: true, pending: pending.length};
+        } catch (e) {
+            const remaining = getSyncQueue().filter(op => !completedIds.has(op.id));
+            saveSyncQueue(remaining);
+            setConnectionStatus(`同步失败：${formatCloudError(e)} · ${remaining.length} 项已留在本机`, 'error');
+            if (!silent) toast('云端暂时不可用，数据已保存在本机');
+            return {ok: false, error: e, pending: remaining.length};
+        }
+    })();
+    try { return await state.syncPromise; }
+    finally { state.syncPromise = null; }
+}
+function enqueueBatch(operations) {
+    const map = new Map(getSyncQueue().map(op => [`${op.table}:${op.rowId}`, op]));
+    operations.forEach(op => {
+        const rowId = String(op.rowId);
+        map.set(`${op.table}:${rowId}`, {
+            id: generateId(), table: op.table, action: op.action, rowId,
+            data: op.action === 'upsert' ? op.data : undefined,
+            queuedAt: new Date().toISOString()
+        });
+    });
+    if (operations.length) state.localRevision += 1;
+    saveSyncQueue([...map.values()]);
+}
+function localCloudSnapshot() {
+    return {records: getLocalRecords(), teas: getLocalTeas(), notes: getLoveNotes()};
+}
+function queueFullLocalSnapshot() {
+    const snapshot = localCloudSnapshot();
+    enqueueBatch([
+        ...snapshot.records.map(row => ({table: 'records', action: 'upsert', rowId: row.id, data: recordForCloud(row)})),
+        ...snapshot.teas.map(row => ({table: 'milktea', action: 'upsert', rowId: row.id, data: teaForCloud(row)})),
+        ...snapshot.notes.map(row => ({table: 'love_notes', action: 'upsert', rowId: row.id, data: noteForCloud(row)}))
+    ]);
+}
+async function fetchAllRows(table) {
+    const pageSize = 1000;
+    const rows = [];
+    for (let from = 0; from < 100000; from += pageSize) {
+        const {data, error} = await state.supabase.from(table).select('*').range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = Array.isArray(data) ? data : [];
+        rows.push(...page);
+        if (page.length < pageSize) return rows;
+    }
+    throw new Error(`${table} 数据量超过同步上限`);
+}
+async function fetchCloudSnapshot() {
+    const [records, teas, notes] = await Promise.all([
+        fetchAllRows('records'), fetchAllRows('milktea'), fetchAllRows('love_notes')
+    ]);
+    return {records, teas, notes};
+}
+function queueExactCloudReplacement(remote) {
+    const local = localCloudSnapshot();
+    const localIds = {
+        records: new Set(local.records.map(row => row.id)),
+        teas: new Set(local.teas.map(row => row.id)),
+        notes: new Set(local.notes.map(row => row.id))
+    };
+    const deletes = [
+        ...remote.records.filter(row => !localIds.records.has(String(row.id))).map(row => ({table: 'records', action: 'delete', rowId: row.id})),
+        ...remote.teas.filter(row => !localIds.teas.has(String(row.id))).map(row => ({table: 'milktea', action: 'delete', rowId: row.id})),
+        ...remote.notes.filter(row => !localIds.notes.has(String(row.id))).map(row => ({table: 'love_notes', action: 'delete', rowId: row.id}))
+    ];
+    const upserts = [
+        ...local.records.map(row => ({table: 'records', action: 'upsert', rowId: row.id, data: recordForCloud(row)})),
+        ...local.teas.map(row => ({table: 'milktea', action: 'upsert', rowId: row.id, data: teaForCloud(row)})),
+        ...local.notes.map(row => ({table: 'love_notes', action: 'upsert', rowId: row.id, data: noteForCloud(row)}))
+    ];
+    enqueueBatch([...deletes, ...upserts]);
+}
+function applyCloudSnapshot(snapshot) {
+    const records = snapshot.records.map(normalizeRecord);
+    const teas = repairTeaLinks(snapshot.teas, records);
+    const notes = snapshot.notes.map(normalizeNote);
+    writeJson('records', records);
+    writeJson('teas', teas);
+    writeJson('love_notes', notes);
+}
+function renderAllDataViews() {
+    renderFilterOptions();
+    renderRecordList();
+    renderMonthSummary();
+    renderTeaList();
+    renderNotes();
+    renderTodoList();
+    renderCustomCategories();
+    renderThemeSettings();
+    renderDailyQuote();
+    renderStreak();
+    if (document.getElementById('page-stats').classList.contains('active')) renderStats();
+}
+async function syncNow({silent = false} = {}) {
+    if (state.fullSyncPromise) return state.fullSyncPromise;
+    if (!state.supabase) {
+        renderSyncStatus();
+        if (!silent) toast('请先配置 Supabase');
+        return {ok: false, reason: 'not-connected'};
+    }
+    state.fullSyncPromise = (async () => {
+        setConnectionStatus('正在核对本机与云端数据…', 'syncing');
+        try {
+            let handledReplacementToken = null;
+            if (!localStorage.getItem(PENDING_CLOUD_REPLACE_KEY) && localStorage.getItem(SYNC_BOOTSTRAPPED_KEY) !== '1') {
+                // 第一次升级时先上传本机快照，避免旧数据被云端空表覆盖。
+                queueFullLocalSnapshot();
+            }
+
+            let snapshot = null;
+            let settled = false;
+            for (let attempt = 0; attempt < 5; attempt += 1) {
+                const replacementToken = localStorage.getItem(PENDING_CLOUD_REPLACE_KEY);
+                if (replacementToken && replacementToken !== handledReplacementToken) {
+                    const remote = await fetchCloudSnapshot();
+                    queueExactCloudReplacement(remote);
+                    handledReplacementToken = replacementToken;
+                }
+                const flushed = await flushSyncQueue({silent: true});
+                if (!flushed.ok) return flushed;
+                const revisionBeforeFetch = state.localRevision;
+                snapshot = await fetchCloudSnapshot();
+                const latestReplacementToken = localStorage.getItem(PENDING_CLOUD_REPLACE_KEY);
+                if (getSyncQueue().length === 0 && revisionBeforeFetch === state.localRevision && (!latestReplacementToken || latestReplacementToken === handledReplacementToken)) {
+                    settled = true;
+                    break;
+                }
+            }
+            if (!settled) throw new Error('同步期间产生了新的本机更改，请再试一次');
+
+            applyCloudSnapshot(snapshot);
+            localStorage.setItem(SYNC_BOOTSTRAPPED_KEY, '1');
+            if (localStorage.getItem(PENDING_CLOUD_REPLACE_KEY) === handledReplacementToken) localStorage.removeItem(PENDING_CLOUD_REPLACE_KEY);
+            localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+            renderAllDataViews();
+            renderSyncStatus();
+            if (!silent) toast('本机与云端已同步');
+            return {ok: true};
+        } catch (e) {
+            setConnectionStatus(`同步失败：${formatCloudError(e)} · 本机数据未丢失`, 'error');
+            if (!silent) toast('同步失败，本机数据不受影响');
+            return {ok: false, error: e};
+        }
+    })();
+    try { return await state.fullSyncPromise; }
+    finally { state.fullSyncPromise = null; }
+}
+
+// ==================== 备份与恢复 ====================
+function collectBackup() {
+    return {
+        app: BACKUP_APP,
+        version: BACKUP_VERSION,
+        exported_at: new Date().toISOString(),
+        data: {
+            records: getLocalRecords(),
+            teas: getLocalTeas(),
+            love_notes: getLoveNotes(),
+            todos: getTodos(),
+            custom_categories: getCustomCategories(),
+            monthly_budget: localStorage.getItem('monthly_budget') || '0',
+            active_theme: getActiveThemeId(),
+            theme_names: getThemeNames()
+        }
+    };
+}
+function downloadBackup() {
+    const backup = collectBackup();
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `记账本完整备份_${getTodayStr()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('完整备份已导出');
+}
+function normalizeBackup(raw) {
+    const data = raw && raw.data && raw.app === BACKUP_APP ? raw.data : raw;
+    if (!data || !Array.isArray(data.records) || !Array.isArray(data.teas)) throw new Error('不是有效的记账本备份');
+    const records = data.records.map(normalizeRecord);
+    const categories = data.custom_categories || data.categories || {expense: [], income: []};
+    const todos = Array.isArray(data.todos) ? data.todos.map(value => {
+        const todo = value && typeof value === 'object' ? value : {};
+        return {
+            id: String(todo.id || generateId()), text: String(todo.text || ''), done: Boolean(todo.done),
+            created_at: String(todo.created_at || new Date().toISOString())
+        };
+    }) : [];
+    return {
+        records,
+        teas: repairTeaLinks(data.teas.map(normalizeTea), records),
+        love_notes: Array.isArray(data.love_notes) ? data.love_notes.map(normalizeNote) : [],
+        todos,
+        custom_categories: {
+            expense: Array.isArray(categories.expense) ? categories.expense.map(String) : [],
+            income: Array.isArray(categories.income) ? categories.income.map(String) : []
+        },
+        monthly_budget: String(data.monthly_budget == null ? '0' : data.monthly_budget),
+        active_theme: BUILTIN_THEMES[data.active_theme] ? data.active_theme : getActiveThemeId(),
+        theme_names: data.theme_names && typeof data.theme_names === 'object' && !Array.isArray(data.theme_names) ? data.theme_names : {}
+    };
+}
+function queueKnownReplacement(previous, next) {
+    const nextIds = {
+        records: new Set(next.records.map(row => row.id)),
+        teas: new Set(next.teas.map(row => row.id)),
+        notes: new Set(next.love_notes.map(row => row.id))
+    };
+    enqueueBatch([
+        ...previous.records.filter(row => !nextIds.records.has(row.id)).map(row => ({table: 'records', action: 'delete', rowId: row.id})),
+        ...previous.teas.filter(row => !nextIds.teas.has(row.id)).map(row => ({table: 'milktea', action: 'delete', rowId: row.id})),
+        ...previous.notes.filter(row => !nextIds.notes.has(row.id)).map(row => ({table: 'love_notes', action: 'delete', rowId: row.id})),
+        ...next.records.map(row => ({table: 'records', action: 'upsert', rowId: row.id, data: recordForCloud(row)})),
+        ...next.teas.map(row => ({table: 'milktea', action: 'upsert', rowId: row.id, data: teaForCloud(row)})),
+        ...next.love_notes.map(row => ({table: 'love_notes', action: 'upsert', rowId: row.id, data: noteForCloud(row)}))
+    ]);
+}
+function applyImportedBackup(data) {
+    writeJson('records', data.records);
+    writeJson('teas', data.teas);
+    writeJson('love_notes', data.love_notes);
+    writeJson('todos', data.todos);
+    writeJson('custom_categories', data.custom_categories);
+    localStorage.setItem('monthly_budget', data.monthly_budget);
+    localStorage.setItem('active_theme', data.active_theme);
+    writeJson('theme_names', data.theme_names);
+}
+async function importBackupFile(file) {
+    if (!file) return;
     try {
-        const {data:records}=await state.supabase.from('records').select('*');
-        const {data:teas}=await state.supabase.from('milktea').select('*');
-        const {data:notes}=await state.supabase.from('love_notes').select('*');
-        if(records) localStorage.setItem('records',JSON.stringify(records));
-        if(teas) localStorage.setItem('teas',JSON.stringify(teas));
-        if(notes) localStorage.setItem('love_notes',JSON.stringify(notes));
-        renderRecordList();renderMonthSummary();renderFilterOptions();renderNotes();toast('已从云端拉取');
-    } catch(e){toast('拉取失败: '+e.message);}
+        const parsed = JSON.parse(await file.text());
+        const next = normalizeBackup(parsed);
+        if (!confirm(`将导入 ${next.records.length} 笔账目、${next.teas.length} 条奶茶记录，并替换当前本机数据。继续吗？`)) return;
+        const previous = localCloudSnapshot();
+        try { localStorage.setItem('last_pre_import_backup_v2', JSON.stringify(collectBackup())); } catch (e) { console.warn('无法保存导入前快照', e); }
+        applyImportedBackup(next);
+        queueKnownReplacement(previous, next);
+        localStorage.setItem(PENDING_CLOUD_REPLACE_KEY, generateId());
+        applyTheme(next.active_theme);
+        const budgetInput = document.getElementById('budget-input');
+        if (budgetInput) budgetInput.value = next.monthly_budget;
+        renderAllDataViews();
+        toast('备份已恢复到本机');
+        if (state.supabase) {
+            const result = await syncNow({silent: true});
+            toast(result.ok ? '导入完成，云端已同步' : '导入完成，云端稍后自动补传');
+        }
+    } catch (e) {
+        toast(`导入失败：${e.message}`);
+    }
+}
+async function clearAllData() {
+    if (!confirm('确定清空账目、奶茶、留言和待办数据？')) return;
+    if (!confirm('此操作不可撤销。真的确定吗？')) return;
+    const previous = localCloudSnapshot();
+    const next = {records: [], teas: [], love_notes: []};
+    queueKnownReplacement(previous, next);
+    ['records', 'teas', 'love_notes', 'todos', 'custom_categories', 'monthly_budget'].forEach(key => localStorage.removeItem(key));
+    localStorage.setItem(PENDING_CLOUD_REPLACE_KEY, generateId());
+    const budgetInput = document.getElementById('budget-input');
+    if (budgetInput) budgetInput.value = '';
+    renderAllDataViews();
+    toast('本机数据已清空');
+    if (state.supabase) await syncNow({silent: true});
 }
 
 // ==================== 初始化 ====================
@@ -367,9 +913,9 @@ function init() {
     if(savedBudget) document.getElementById('budget-input').value=savedBudget;
 
     // 导航
-    document.querySelectorAll('.nav-item').forEach(item=>{item.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));item.classList.add('active');document.getElementById(`page-${item.dataset.page}`).classList.add('active');if(item.dataset.page==='stats')renderStats();if(item.dataset.page==='milktea')renderTeaList();if(item.dataset.page==='settings'){renderCustomCategories();renderThemeSettings();}if(item.dataset.page==='notes')renderNotes();if(item.dataset.page==='todo')renderTodoList();});});
+    document.querySelectorAll('.nav-item').forEach(item=>{item.addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));item.classList.add('active');document.getElementById(`page-${item.dataset.page}`).classList.add('active');if(item.dataset.page==='stats')renderStats();if(item.dataset.page==='milktea')renderTeaList();if(item.dataset.page==='settings'){renderCustomCategories();renderThemeSettings();renderSyncStatus();}if(item.dataset.page==='notes')renderNotes();if(item.dataset.page==='todo')renderTodoList();});});
     // 设置按钮
-    document.getElementById('btn-go-settings').addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-settings').classList.add('active');renderCustomCategories();renderThemeSettings();});
+    document.getElementById('btn-go-settings').addEventListener('click',()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-settings').classList.add('active');renderCustomCategories();renderThemeSettings();renderSyncStatus();});
 
     // 类型切换
     document.querySelectorAll('.toggle-btn').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');state.currentType=btn.dataset.type;state.selectedCategory=null;renderCategoryGrid('category-grid',null,null,onHomeCatClick);});});
@@ -379,7 +925,7 @@ function init() {
         const amount=parseFloat(document.getElementById('amount').value),date=document.getElementById('record-date').value,time=document.getElementById('record-time').value,note=document.getElementById('note').value.trim();
         if(!amount||amount<=0){toast('请输入金额');return;}if(!state.selectedCategory){toast('请选择分类');return;}
         await saveRecord({id:generateId(),type:state.currentType,amount,category:state.selectedCategory,date,time,note,created_at:new Date().toISOString()});
-        toast('记录成功');document.getElementById('amount').value='';document.getElementById('note').value='';document.getElementById('record-time').value=getNowTime();state.selectedCategory=null;
+        toast(getSyncQueue().length ? '已保存到本机，等待同步' : '记录成功');document.getElementById('amount').value='';document.getElementById('note').value='';document.getElementById('record-time').value=getNowTime();state.selectedCategory=null;
         renderCategoryGrid('category-grid',null,null,onHomeCatClick);renderRecordList();renderMonthSummary();
     });
 
@@ -402,10 +948,10 @@ function init() {
     document.getElementById('btn-add-tea').addEventListener('click',async()=>{
         const date=document.getElementById('tea-date').value,time=document.getElementById('tea-time').value,brand=document.getElementById('tea-brand').value.trim(),name=document.getElementById('tea-name').value.trim(),price=parseFloat(document.getElementById('tea-price').value);
         if(!brand){toast('请输入品牌');return;}if(!name){toast('请输入名称');return;}if(!price||price<=0){toast('请输入价格');return;}if(state.teaRating===0){toast('请评分');return;}
-        const teaRecordId=generateId();
-        await saveRecord({id:teaRecordId,type:'expense',amount:price,category:'奶茶',date,time,note:`${brand} - ${name}`,created_at:new Date().toISOString()});
-        await saveTea({id:generateId(),date,time,brand,name,price,rating:state.teaRating,ice:state.selectedIce,sugar:state.selectedSugar,recordId:teaRecordId,created_at:new Date().toISOString()});
-        toast('记录成功');document.getElementById('tea-brand').value='';document.getElementById('tea-name').value='';document.getElementById('tea-price').value='';document.getElementById('tea-time').value=getNowTime();
+        const sharedId=generateId(),createdAt=new Date().toISOString();
+        await saveRecord({id:sharedId,type:'expense',amount:price,category:'奶茶',date,time,note:`${brand} - ${name}`,created_at:createdAt});
+        await saveTea({id:sharedId,date,time,brand,name,price,rating:state.teaRating,ice:state.selectedIce,sugar:state.selectedSugar,recordId:sharedId,created_at:createdAt});
+        toast(getSyncQueue().length ? '已保存到本机，等待同步' : '记录成功');document.getElementById('tea-brand').value='';document.getElementById('tea-name').value='';document.getElementById('tea-price').value='';document.getElementById('tea-time').value=getNowTime();
         state.teaRating=0;document.querySelectorAll('#tea-rating .star').forEach(s=>{s.textContent='☆';s.classList.remove('filled');});
         renderTeaList();renderRecordList();renderMonthSummary();
     });
@@ -423,11 +969,23 @@ function init() {
 
     // Supabase
     document.getElementById('btn-save-config').addEventListener('click',async()=>{
-        const url=document.getElementById('supabase-url').value.trim(),key=document.getElementById('supabase-key').value.trim(),st=document.getElementById('connection-status');
-        if(!url||!key){toast('请填写完整');return;}localStorage.setItem('supabase_url',url);localStorage.setItem('supabase_key',key);
-        try{state.supabase=supabase.createClient(url,key);const{error}=await state.supabase.from('records').select('id').limit(1);if(error)throw error;st.textContent='连接成功！';st.className='connection-status success';await syncToCloud();toast('连接成功');}catch(e){st.textContent='连接失败: '+e.message;st.className='connection-status error';}
+        const url=document.getElementById('supabase-url').value.trim(),key=document.getElementById('supabase-key').value.trim();
+        if(!url||!key){toast('请填写完整');return;}
+        setConnectionStatus('正在测试连接和数据表…','syncing');
+        try{
+            const candidate=supabase.createClient(url,key);
+            await checkCloudClient(candidate);
+            if(state.fullSyncPromise)await state.fullSyncPromise;
+            else if(state.syncPromise)await state.syncPromise;
+            const changed=url!==localStorage.getItem('supabase_url')||key!==localStorage.getItem('supabase_key');
+            localStorage.setItem('supabase_url',url);localStorage.setItem('supabase_key',key);
+            if(changed)localStorage.removeItem(SYNC_BOOTSTRAPPED_KEY);
+            state.supabase=candidate;
+            const result=await syncNow({silent:true});
+            toast(result.ok?'连接成功，数据已同步':'连接成功，数据稍后自动补传');
+        }catch(e){setConnectionStatus(`连接失败：${formatCloudError(e)}`,'error');}
     });
-    document.getElementById('btn-sync-from-cloud').addEventListener('click',syncFromCloud);
+    document.getElementById('btn-sync-now').addEventListener('click',()=>syncNow());
 
     // 预算
     document.getElementById('btn-save-budget').addEventListener('click',()=>{const v=document.getElementById('budget-input').value;localStorage.setItem('monthly_budget',v||'0');toast('预算已保存');});
@@ -450,14 +1008,16 @@ function init() {
     // 自定义分类
     document.getElementById('btn-add-category').addEventListener('click',()=>{
         const type=document.getElementById('custom-cat-type').value,name=document.getElementById('custom-cat-name').value.trim();
-        if(!name){toast('请输入名称');return;}const custom=JSON.parse(localStorage.getItem('custom_categories')||'{"expense":[],"income":[]}');
+        if(!name){toast('请输入名称');return;}const custom=getCustomCategories();
         if(custom[type].includes(name)||DEFAULT_CATEGORIES[type].includes(name)){toast('已存在');return;}
-        custom[type].push(name);localStorage.setItem('custom_categories',JSON.stringify(custom));document.getElementById('custom-cat-name').value='';renderCustomCategories();renderFilterOptions();toast('添加成功');
+        custom[type].push(name);writeJson('custom_categories',custom);document.getElementById('custom-cat-name').value='';renderCustomCategories();renderFilterOptions();toast('添加成功');
     });
 
     // 导出/清空
-    document.getElementById('btn-export').addEventListener('click',()=>{const d={records:getLocalRecords(),teas:getLocalTeas(),categories:JSON.parse(localStorage.getItem('custom_categories')||'{}'),exported_at:new Date().toISOString()};const b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`记账数据_${getTodayStr()}.json`;a.click();URL.revokeObjectURL(u);toast('导出成功');});
-    document.getElementById('btn-clear').addEventListener('click',()=>{if(confirm('确定清空所有数据？')){if(confirm('真的确定？')){localStorage.removeItem('records');localStorage.removeItem('teas');renderRecordList();renderMonthSummary();toast('已清空');}}});
+    document.getElementById('btn-export').addEventListener('click',downloadBackup);
+    document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('import-file').click());
+    document.getElementById('import-file').addEventListener('change',async(e)=>{const file=e.target.files&&e.target.files[0];await importBackupFile(file);e.target.value='';});
+    document.getElementById('btn-clear').addEventListener('click',clearAllData);
 
     // 加载配置
     const su=localStorage.getItem('supabase_url'),sk=localStorage.getItem('supabase_key');
@@ -483,13 +1043,14 @@ function init() {
         const text = input.value.trim();
         if (!text) { toast('写点什么吧'); return; }
         const note = { id: generateId(), content: text, date: getTodayStr(), time: getNowTime(), created_at: new Date().toISOString() };
-        const notes = JSON.parse(localStorage.getItem('love_notes') || '[]');
+        const notes = getLoveNotes();
         notes.unshift(note);
-        localStorage.setItem('love_notes', JSON.stringify(notes));
-        if (state.supabase) { try { await state.supabase.from('love_notes').insert(note); } catch(e) {} }
+        writeJson('love_notes', notes);
+        queueUpsert('love_notes', note);
+        await flushSyncQueue({silent: true});
         input.value = '';
         renderNotes();
-        toast('留言成功 💌');
+        toast(getSyncQueue().length ? '留言已保存到本机' : '留言成功 💌');
     });
     renderNotes();
 
@@ -508,6 +1069,22 @@ function init() {
     document.getElementById('todo-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') document.getElementById('btn-add-todo').click();
     });
+
+    renderSyncStatus();
+    if (state.supabase) setTimeout(() => syncNow({silent: true}), 0);
+    window.addEventListener('online', () => { if (state.supabase) syncNow({silent: true}); });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && state.supabase && getSyncQueue().length) {
+            if (localStorage.getItem(PENDING_CLOUD_REPLACE_KEY)) syncNow({silent: true});
+            else flushSyncQueue({silent: true});
+        }
+    });
+    setInterval(() => {
+        if (!document.hidden && state.supabase && getSyncQueue().length) {
+            if (localStorage.getItem(PENDING_CLOUD_REPLACE_KEY)) syncNow({silent: true});
+            else flushSyncQueue({silent: true});
+        }
+    }, 60000);
 }
 
 // ==================== 每日一句 ====================
@@ -550,7 +1127,7 @@ function renderStreak() {
 
 // ==================== 留言板 ====================
 function renderNotes() {
-    const all = JSON.parse(localStorage.getItem('love_notes') || '[]');
+    const all = getLoveNotes();
     all.sort((a, b) => {
         if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
         if ((a.time || '') !== (b.time || '')) return (b.time || '').localeCompare(a.time || '');
@@ -561,18 +1138,24 @@ function renderNotes() {
     if (notes.length === 0) { el.innerHTML = '<div class="empty-state">还没有留言</div>'; return; }
     el.innerHTML = notes.map(n => `<div class="record-item"><div class="record-left"><span class="record-category">${esc(n.content)}</span><span class="record-note">${esc(n.date)} ${esc(n.time||'')}</span></div><div class="record-right"><span class="record-delete" data-nid="${n.id}">✕</span></div></div>`).join('');
     el.querySelectorAll('.record-delete').forEach(btn => {
-        btn.addEventListener('click', () => {
-            let notes = JSON.parse(localStorage.getItem('love_notes') || '[]');
+        btn.addEventListener('click', async () => {
+            let notes = getLoveNotes();
             notes = notes.filter(n => n.id !== btn.dataset.nid);
-            localStorage.setItem('love_notes', JSON.stringify(notes));
+            writeJson('love_notes', notes);
+            queueDelete('love_notes', btn.dataset.nid);
+            await flushSyncQueue({silent: true});
             renderNotes();
+            toast(getSyncQueue().length ? '已从本机删除，等待同步' : '留言已删除');
         });
     });
 }
 
 // ==================== 待办清单 ====================
-function getTodos() { return JSON.parse(localStorage.getItem('todos') || '[]'); }
-function saveTodos(todos) { localStorage.setItem('todos', JSON.stringify(todos)); }
+function getTodos() {
+    const todos = readJson('todos', []);
+    return Array.isArray(todos) ? todos : [];
+}
+function saveTodos(todos) { writeJson('todos', todos); }
 
 function renderTodoList() {
     const todos = getTodos();

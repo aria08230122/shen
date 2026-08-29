@@ -230,10 +230,11 @@
         <header class="page-header"><h1>设置</h1></header>
         <div class="card">
             <h3>Supabase 连接</h3>
+            <p class="settings-note">每次操作都会先保存到本机。断网或云端暂停时会进入待同步队列，恢复后自动补传。</p>
             <div class="form-group"><label>Project URL</label><input type="text" id="supabase-url" placeholder="https://xxx.supabase.co"></div>
             <div class="form-group"><label>Anon Key</label><input type="text" id="supabase-key" placeholder="eyJhbGciOi..."></div>
             <button class="btn-primary" id="btn-save-config">保存连接</button>
-            <button class="btn-secondary" id="btn-sync-from-cloud" style="margin-top:8px">从云端拉取数据</button>
+            <button class="btn-secondary" id="btn-sync-now" style="margin-top:8px">立即同步</button>
             <div class="connection-status" id="connection-status"></div>
         </div>
         <div class="card">
@@ -268,7 +269,10 @@
         </div>
         <div class="card">
             <h3>数据管理</h3>
-            <button class="btn-secondary" id="btn-export">导出数据 (JSON)</button>
+            <p class="settings-note">完整备份包含账目、奶茶、留言、待办、预算、分类和主题设置，不包含 Supabase 密钥。</p>
+            <button class="btn-secondary" id="btn-export">导出完整备份 (JSON)</button>
+            <button class="btn-secondary" id="btn-import">导入备份</button>
+            <input type="file" id="import-file" accept="application/json,.json" hidden>
             <button class="btn-danger" id="btn-clear">清空所有数据</button>
         </div>
     </div>
